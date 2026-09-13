@@ -16,6 +16,12 @@ All you have to do is invite the bot to your server! <insert link here>
 ## For Developers
 TODO: steps to install the language, libraries, set up the database, and so on.
 
+Required Python libraries (can be installed from `requirements.txt`):
+ * aiosqlite
+ * discord.py
+ * httpx
+ * python-dotenv
+
 # Usage
 TODO: list available commands and what they can do and what parameters they take, with maybe some example screenshots, GIFs, or output text.
 
