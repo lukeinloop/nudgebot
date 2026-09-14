@@ -1,0 +1,2 @@
+# ignore environment variables to avoid accidentally exposing the bot's API key
+*.env
