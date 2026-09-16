@@ -24,6 +24,8 @@ Required Python libraries (can be installed from `requirements.txt`):
  * httpx
  * python-dotenv
 
+This project uses the (TODO: insert link) Black formatter. Ensure all contributions are auto-formatted before merging with main.
+
 # Usage
 TODO: list available commands and what they can do and what parameters they take, with maybe some example screenshots, GIFs, or output text.
 
