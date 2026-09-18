@@ -10,12 +10,15 @@ from typing import Optional
 import discord
 from discord import app_commands
 
+from database.backend import DBHandler
+
 
 class NudgeBot(discord.Client):
     def __init__(self, *, intents: discord.Intents):
         super().__init__(intents=intents)
 
         self.guild_id: None | discord.Object = None
+        self.db: None | DBHandler = None
 
         self.tree = app_commands.CommandTree(self)
 
@@ -73,8 +76,8 @@ async def on_message(message: discord.Message):
     if type(message.channel) == discord.DMChannel:
         # this is someone trying to give us their API token, so store it
 
-        #TODO: check to see if there is already one stored
-        #TODO: input validtion to make sure it is actually the appropriate length and type
+        # TODO: check to see if there is already one stored
+        # TODO: input validtion to make sure it is actually the appropriate length and type
 
         print(f"Got API token: {message.content}")
 
