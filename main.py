@@ -1,5 +1,7 @@
 # TODO: insert standard file header and docstrings
 
+from discord import Object
+
 import os
 from dotenv import load_dotenv
 
@@ -9,6 +11,11 @@ from bot.bot import client
 def main():
     # automatically grab environment variables from a .env file in the same folder
     load_dotenv()
+
+    # TODO: need to find a way to call sync_commands or something from here with the environment variables for the servers
+    # the bot is in somehow
+
+    client.guild_id = Object(os.environ["GUILD_ID"])
 
     client.run(os.environ["TOKEN"])
 
