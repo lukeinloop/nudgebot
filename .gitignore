@@ -2,3 +2,6 @@
 *.env
 
 */__pycache__
+
+# don't commit the database!
+*.sqlite

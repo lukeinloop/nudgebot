@@ -1,5 +1,7 @@
 # TODO: insert standard file header and docstrings
 
+import asyncio
+
 from discord import Object
 
 import os
@@ -14,8 +16,10 @@ def main():
     # automatically grab environment variables from a .env file in the same folder
     load_dotenv()
 
-    #FIXME
-    db = DBHandler()
+    # TODO do we need to check if this is already initialized?
+    db = DBHandler(os.environ["DB_PATH"])
+    asyncio.run(db.connect())
+    asyncio.run(db.initialize_db())
 
     # TODO: need to find a way to call sync_commands or something from here with the environment variables for the servers
     # the bot is in somehow
