@@ -111,20 +111,22 @@ class DBHandler:
         )
 
     # Checks the "users" table for the given discord user ID
-    async def has_api_key(self, discord_id: int) -> bool:
+    async def get_api_key(self, discord_id: int) -> None | str:
         cursor = await self.db.execute(
             """
-            SELECT 1 
+            SELECT * 
             FROM users u
             JOIN canvas_credentials c ON c.user_id = u.user_id
             WHERE u.discord_id = ?
             LIMIT 1
-            RETURNING access_key,
             """,
             (discord_id,),
         )
 
-        return await cursor.fetchone() is not None
+        token = await cursor.fetchone()
+        if token is not None:
+            return token[9]
+        return None
 
     async def add_api_key(self, discord_id: int, canvas_base_url: str, token: str):
         # find internal DB user id from discord id

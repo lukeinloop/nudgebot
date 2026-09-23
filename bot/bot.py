@@ -56,12 +56,12 @@ async def link(interaction: discord.Interaction):
     )
 
 # Courses command to get course list
-@client.tree.command
+@client.tree.command()
 async def courses(interaction: discord.Interaction):
-    await interaction.response.defer(ephermal=True)
+    await interaction.response.defer(ephemeral=True)
 
     
-    api_key = await client.db.has_api_key(interaction.user.id)
+    api_key = await client.db.get_api_key(interaction.user.id)
 
     if not api_key:
         await interaction.followup.send(
