@@ -69,11 +69,13 @@ async def on_message(message: discord.Message):
     if type(message.channel) == discord.DMChannel:
         # this is someone trying to give us their API token, so store it
 
-        if not await client.db.has_api_key(message.author.id):
+        if not await client.db.user_exists(message.author.id):
             await client.db.create_user(message.author.id, message.author.display_name)
 
         # replace / update API key
-        await client.db.add_api_key(message.author.id, message.content.strip())
+        await client.db.add_api_key(
+            message.author.id, "https://canvas.ou.edu/", message.content.strip()
+        )
 
         print(f"Got API token: {message.content}")
 

@@ -9,12 +9,11 @@ class DBHandler:
     # TODO: maybe it should have a password or something stored in the .env?
     def __init__(self, db_path: str):
         self.db_path = db_path
-        self.db = None
+        self.db: aiosqlite.Connection = None
 
     async def connect(self):
         self.db = await aiosqlite.connect(self.db_path)
         await self.db.execute("PRAGMA foreign_keys = ON")
-
 
     async def initialize_db(self):
         """Initialize the database with tables defined in the database schema.
@@ -118,7 +117,7 @@ class DBHandler:
             SELECT 1 
             FROM users u
             JOIN canvas_credentials c ON c.user_id = u.user_id
-            WHERE u.discord = ?
+            WHERE u.discord_id = ?
             LIMIT 1
             """,
             (discord_id,),
@@ -126,23 +125,57 @@ class DBHandler:
 
         return await cursor.fetchone() is not None
 
-    async def add_api_key(self, user_id: int, canvas_base_url: str, token: str):
-        # TODO do we need to check if it already exists? for now just replace it anyways.
-        await self.db.execute(
+    async def add_api_key(self, discord_id: int, canvas_base_url: str, token: str):
+        # find internal DB user id from discord id
+        cursor = await self.db.execute(
             """
-            INSERT INTO canvas_credentials (
-                user_id,
-                canvas_base_url,
-                auth_type,
-                access_token,
-                linked_at
-            )
-            VALUES (?, ?, ?, ?)
+            SELECT 1 
+            FROM users u
+            WHERE u.discord_id = ?
+            LIMIT 1
             """,
-            (user_id, canvas_base_url, "personal token", token, time.time(),
-            ),
+            (discord_id,),
         )
-        await self.db.commit()
+        result = await cursor.fetchone()
+
+        if result is not None:
+            user_id = result[0]
+
+            await self.db.execute(
+                """
+                INSERT INTO canvas_credentials (
+                    user_id,
+                    canvas_base_url,
+                    auth_type,
+                    access_token,
+                    linked_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    canvas_base_url,
+                    "personal token",
+                    token,
+                    time.time(),
+                ),
+            )
+            await self.db.commit()
+        else:
+            print("Error: could not user with that discord ID!")
+
+    async def user_exists(self, discord_id: int) -> bool:
+        cursor = await self.db.execute(
+            """
+                SELECT 1 
+                FROM users u
+                WHERE u.discord_id = ?
+                LIMIT 1
+                """,
+            (discord_id,),
+        )
+
+        return await cursor.fetchone() is not None
 
     async def create_user(self, discord_id: int, display_name: str):
         cursor = await self.db.execute(
