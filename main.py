@@ -16,14 +16,12 @@ def main():
     # automatically grab environment variables from a .env file in the same folder
     load_dotenv()
 
-    # TODO do we need to check if this is already initialized?
+    # initialize DB
     db = DBHandler(os.environ["DB_PATH"])
     asyncio.run(db.connect())
     asyncio.run(db.initialize_db())
 
-    # TODO: need to find a way to call sync_commands or something from here with the environment variables for the servers
-    # the bot is in somehow
-
+    # initialize bot (after DB so it is guaranteed to be loaded)
     client.guild_id = Object(os.environ["GUILD_ID"])
     client.db = db
 
@@ -31,7 +29,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # TODO: have some sort of auto-restart / reconnect feature?
-    # or we can handle that via command line script or systemctl process
-
     main()

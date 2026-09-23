@@ -1,9 +1,4 @@
-# TODO: add like, a standard header with authorship and license here or somethin
-
-# this file was taken from https://github.com/Rapptz/discord.py/blob/v2.7.1/examples/app_commands/basic.py
-# also check the documentation at https://discordpy.readthedocs.io/en/stable/interactions/api.html#application-commands
-# and the discord docs: https://docs.discord.com/developers/interactions/application-commands
-
+# this file was modified from: https://github.com/Rapptz/discord.py/blob/v2.7.1/examples/app_commands/basic.py
 
 from typing import Optional
 
@@ -18,11 +13,10 @@ class NudgeBot(discord.Client):
         super().__init__(intents=intents)
 
         self.guild_id: None | discord.Object = None
-        self.db: None | DBHandler = None
+        self.db: DBHandler = None
 
         self.tree = app_commands.CommandTree(self)
 
-    # TODO: document this or something
     async def setup_hook(self):
         if self.guild_id is None:
             return
@@ -32,12 +26,10 @@ class NudgeBot(discord.Client):
         await self.tree.sync(guild=self.guild_id)
 
 
-# TODO: replace with actual Intents
 intents = discord.Intents.all()
 client = NudgeBot(intents=intents)
 
 
-# TODO: replace this or something this was from the example file
 @client.event
 async def on_ready():
     print(f"Logged in as {client.user} (ID: {client.user.id})")
@@ -54,13 +46,14 @@ async def link(interaction: discord.Interaction):
         await interaction.user.create_dm()
 
     assert interaction.user.dm_channel is not None
-    # TODO: might need a try/catch around this if not open DMs?
     await interaction.user.dm_channel.send(
         f"""TODO: insert instructions for locating your canvas API token (with screenshots preferably) here.
         Please respond to this message with your API token."""
     )
 
-    # TODO: send a response in the original channel that has instructions like "here is how to link you account" or like "check DMs"
+    await interaction.response.send_message(
+        "Please check your DMs for further instructions!"
+    )
 
 
 # !!! THIS IS ONLY FOR INTERACTING IN DMS !!!
@@ -76,20 +69,13 @@ async def on_message(message: discord.Message):
     if type(message.channel) == discord.DMChannel:
         # this is someone trying to give us their API token, so store it
 
-        # TODO: check to see if there is already one stored
-        if await client.db.has_api_key(message.author.id):
-            # TODO: what to we do here? update the token?
-            pass
-        else:
+        if not await client.db.has_api_key(message.author.id):
             await client.db.create_user(message.author.id, message.author.display_name)
 
-            # TODO: need to do input validation to make sure token is correct
-            # TODO: also need to encrypt it
-            await client.db.add_api_key(message.content.strip())
+        # replace / update API key
+        await client.db.add_api_key(message.author.id, message.content.strip())
 
         print(f"Got API token: {message.content}")
-
-    # FIXME do we want to have them able to ask for help in DMs as well?
 
     # otherwise, do nothing
     return
