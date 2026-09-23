@@ -119,6 +119,7 @@ class DBHandler:
             JOIN canvas_credentials c ON c.user_id = u.user_id
             WHERE u.discord_id = ?
             LIMIT 1
+            RETURNING access_key,
             """,
             (discord_id,),
         )

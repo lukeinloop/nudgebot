@@ -4,6 +4,7 @@ from typing import Optional
 
 import discord
 from discord import app_commands
+import httpx
 
 from database.backend import DBHandler
 
@@ -53,6 +54,57 @@ async def link(interaction: discord.Interaction):
     await interaction.response.send_message(
         "Please check your DMs for further instructions!"
     )
+
+# Courses command to get course list
+@client.tree.command
+async def courses(interaction: discord.Interaction):
+    await interaction.response.defer(ephermal=True)
+
+    
+    api_key = await client.db.has_api_key(interaction.user.id)
+
+    if not api_key:
+        await interaction.followup.send(
+            "You haven't linked your Canvas account yet. Use /link to get started.", 
+            ephemeral=True
+        )
+        return
+
+    url = "https://canvas.ou.edu/api/v1/courses"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    params = {"per_page": 20, "enrollment_state": "active"}
+
+    try:
+        # async client since discord.py is asynchronous
+        async with httpx.AsyncClient() as http_client:
+            response = await http_client.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            courses_data = response.json()
+
+        if not courses_data:
+            await interaction.followup.send("No active courses found.", ephemeral=True)
+            return
+
+        message_lines = []
+        for course in courses_data:
+            course_name = course.get("name") or course.get("course_code", "Unnamed Course")
+            message_lines.append(f"• **{course_name}** (ID: `{course.get('id')}`)")
+
+        # Send the finalized list
+        await interaction.followup.send("\n".join(message_lines), ephemeral=True)
+
+    except httpx.HTTPStatusError as e:
+        await interaction.followup.send(
+            f"Failed to retrieve courses. Canvas API returned error status: {e.response.status_code}", 
+            ephemeral=True
+        )
+    except Exception as e:
+        await interaction.followup.send(
+            "An unexpected error occurred.", 
+            ephemeral=True
+        )
+
+
 
 
 # !!! THIS IS ONLY FOR INTERACTING IN DMS !!!
