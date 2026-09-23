@@ -16,11 +16,15 @@ All you have to do is invite the bot to your server! <insert link here>
 ## For Developers
 TODO: steps to install the language, libraries, set up the database, and so on.
 
+Create a copy the `.env-example` file and rename it to `.env`. Copy the token from the Discord Developer Portal > Applications > NudgeBot > Bot and paste it in for the `TOKEN` environment variable.
+
 Required Python libraries (can be installed from `requirements.txt`):
  * aiosqlite
  * discord.py
  * httpx
  * python-dotenv
+
+This project uses the (TODO: insert link) Black formatter. Ensure all contributions are auto-formatted before merging with main.
 
 # Usage
 TODO: list available commands and what they can do and what parameters they take, with maybe some example screenshots, GIFs, or output text.
