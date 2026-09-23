@@ -9,9 +9,12 @@ class DBHandler:
     # TODO: maybe it should have a password or something stored in the .env?
     def __init__(self, db_path: str):
         self.db_path = db_path
+        self.db = None
 
     async def connect(self):
         self.db = await aiosqlite.connect(self.db_path)
+        await self.db.execute("PRAGMA foreign_keys = ON")
+
 
     async def initialize_db(self):
         """Initialize the database with tables defined in the database schema.
@@ -111,19 +114,46 @@ class DBHandler:
     # Checks the "users" table for the given discord user ID
     async def has_api_key(self, discord_id: int) -> bool:
         cursor = await self.db.execute(
-            f"SELECT * FROM users WHERE discord_id EQUALS {discord_id}"
+            """
+            SELECT 1 
+            FROM users u
+            JOIN canvas_credentials c ON c.user_id = u.user_id
+            WHERE u.discord = ?
+            LIMIT 1
+            """,
+            (discord_id,),
         )
 
-        return cursor.fetchall() == 0
+        return await cursor.fetchone() is not None
 
-    async def add_api_key(self, user_id: int, token: str):
+    async def add_api_key(self, user_id: int, canvas_base_url: str, token: str):
         # TODO do we need to check if it already exists? for now just replace it anyways.
-        await self.db.execute("UPDATE users SET ")
+        await self.db.execute(
+            """
+            INSERT INTO canvas_credentials (
+                user_id,
+                canvas_base_url,
+                auth_type,
+                access_token,
+                linked_at
+            )
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, canvas_base_url, "personal token", token, time.time(),
+            ),
+        )
+        await self.db.commit()
 
     async def create_user(self, discord_id: int, display_name: str):
-        # TODO maybe we do INSERT OR REPLACE or something instead?
-        await self.db.execute(
-            f"INSERT INTO users VALUES({discord_id}, NULL, {display_name}, {time.time()})"
+        cursor = await self.db.execute(
+            """
+            INSERT INTO users (discord_id, display_name, created_at)
+            VALUES (?, ?, ?)            
+            """,
+            (discord_id, display_name, time.time()),
         )
+        await self.db.commit()
+
+        return cursor.lastrowid
 
         # TODO: need to also create a row for them in the canvas table
