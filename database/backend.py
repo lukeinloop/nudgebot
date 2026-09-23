@@ -1,6 +1,7 @@
 # TODO: insert standard file header / license / whatever
 
 import aiosqlite
+import time
 
 
 # TODO: documentation
@@ -31,7 +32,7 @@ class DBHandler:
         # Canvas credentials
         await self.db.execute(
             "CREATE TABLE IF NOT EXISTS canvas_credentials ("
-            "crediential_id INTEGER PRIMARY KEY,"
+            "credential_id INTEGER PRIMARY KEY,"
             "user_id INTEGER,"
             "canvas_base_url VARCHAR(255) NOT NULL,"  # institution's canvas domain
             "auth_type VARCHAR(20) NOT NULL,"  # should be either 'personal_token' or 'oauth2' TODO can we find a way to enum this or something
@@ -107,11 +108,22 @@ class DBHandler:
             ")"
         )
 
-    def add_api_key(self, token: str):
-        # TODO: check if it already exists
-        # update if it does
-        # create new user if it doesn't or something
-        pass
+    # Checks the "users" table for the given discord user ID
+    async def has_api_key(self, discord_id: int) -> bool:
+        cursor = await self.db.execute(
+            f"SELECT * FROM users WHERE discord_id EQUALS {discord_id}"
+        )
 
-    def create_user(self, user_id: int):
-        pass  # TODO: create new entry or update exist entry
+        return cursor.fetchall() == 0
+
+    async def add_api_key(self, user_id: int, token: str):
+        # TODO do we need to check if it already exists? for now just replace it anyways.
+        await self.db.execute("UPDATE users SET ")
+
+    async def create_user(self, discord_id: int, display_name: str):
+        # TODO maybe we do INSERT OR REPLACE or something instead?
+        await self.db.execute(
+            f"INSERT INTO users VALUES({discord_id}, NULL, {display_name}, {time.time()})"
+        )
+
+        # TODO: need to also create a row for them in the canvas table

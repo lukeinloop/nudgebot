@@ -77,7 +77,15 @@ async def on_message(message: discord.Message):
         # this is someone trying to give us their API token, so store it
 
         # TODO: check to see if there is already one stored
-        # TODO: input validtion to make sure it is actually the appropriate length and type
+        if await client.db.has_api_key(message.author.id):
+            # TODO: what to we do here? update the token?
+            pass
+        else:
+            await client.db.create_user(message.author.id, message.author.display_name)
+
+            # TODO: need to do input validation to make sure token is correct
+            # TODO: also need to encrypt it
+            await client.db.add_api_key(message.content.strip())
 
         print(f"Got API token: {message.content}")
 
