@@ -47,8 +47,7 @@ async def link(interaction: discord.Interaction):
 
     assert interaction.user.dm_channel is not None
     await interaction.user.dm_channel.send(
-        f"""TODO: insert instructions for locating your canvas API token (with screenshots preferably) here.
-        Please respond to this message with your API token."""
+        f"""Go to your canvas settings and generate a new Access Token. Copy and paste the Access Token below and send it."""
     )
 
     await interaction.response.send_message(
@@ -76,8 +75,6 @@ async def on_message(message: discord.Message):
         await client.db.add_api_key(
             message.author.id, "https://canvas.ou.edu/", message.content.strip()
         )
-
-        print(f"Got API token: {message.content}")
 
     # otherwise, do nothing
     return

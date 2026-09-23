@@ -167,11 +167,11 @@ class DBHandler:
     async def user_exists(self, discord_id: int) -> bool:
         cursor = await self.db.execute(
             """
-                SELECT 1 
-                FROM users u
-                WHERE u.discord_id = ?
-                LIMIT 1
-                """,
+            SELECT 1 
+            FROM users u
+            WHERE u.discord_id = ?
+            LIMIT 1
+            """,
             (discord_id,),
         )
 
@@ -188,5 +188,3 @@ class DBHandler:
         await self.db.commit()
 
         return cursor.lastrowid
-
-        # TODO: need to also create a row for them in the canvas table
