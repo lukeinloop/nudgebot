@@ -1,23 +1,64 @@
-# TODO: insert standard file header / license / whatever
+"""
+Database access and initialization utilities for NudgeBot.
+
+This module provides the :class:`DBHandler` class which manages the
+SQLite database used by NudgeBot. It is responsible for establishing
+the database connection, creating the required tables, and performing
+user and Canvas credential operations.
+"""
 
 import aiosqlite
+
 import time
 
 
-# TODO: documentation
 class DBHandler:
-    # TODO: maybe it should have a password or something stored in the .env?
+    """
+    Manage the SQLite database.
+
+    The :class:`DBHandler` class provides an asynchronous interface for
+    connecting to and interacting with the database.
+
+    :param db_path: Path to the database file.
+    :type db_path: str
+    """
+
     def __init__(self, db_path: str):
+        """
+        Initialize database handler.
+
+        :param db_path: Path to the database file.
+        :type db_path: str
+        """
         self.db_path = db_path
         self.db: aiosqlite.Connection = None
 
     async def connect(self):
+        """
+        Establish a connection to the SQLite database.
+
+        The connection is configured with SQLite foreign-key enforcement
+        enabled.
+        """
         self.db = await aiosqlite.connect(self.db_path)
         await self.db.execute("PRAGMA foreign_keys = ON")
 
     async def initialize_db(self):
-        """Initialize the database with tables defined in the database schema.
-        Note: in the future we might need to consider more robust backend solutions with proper backups, migrations, etc.
+        """
+        Initialize the database schema.
+
+        Creates all tables required by NudgeBot if they do not already
+        exist. Existing tables are not modified.
+
+        The database contains tables for Discord users, Canvas
+        credentials, courses, enrollments, assignments, reminders,
+        etc.
+
+        .. note::
+
+           In the future we might need to consider more robust backend
+           solutions with proper backups, migrations, etc.
+
         """
 
         # Discord information
@@ -111,10 +152,22 @@ class DBHandler:
         )
 
     # Checks the "users" table for the given discord user ID
-    async def has_api_key(self, discord_id: int) -> bool:
+    async def get_api_key(self, discord_id: int) -> None | str:
+        """
+        Retrieve the Canvas API token for a Discord user.
+
+        Searches for a Canvas API key associated with the supplied
+        Discord user ID.
+
+        :param discord_id: Discord snowflake ID of the user.
+        :type discord_id: int
+        :return: The user's Canvas API access token, or ``None`` if no
+            token is stored.
+        :rtype: str | None
+        """
         cursor = await self.db.execute(
             """
-            SELECT 1 
+            SELECT * 
             FROM users u
             JOIN canvas_credentials c ON c.user_id = u.user_id
             WHERE u.discord_id = ?
@@ -123,10 +176,27 @@ class DBHandler:
             (discord_id,),
         )
 
-        return await cursor.fetchone() is not None
+        token = await cursor.fetchone()
+        if token is not None:
+            return token[9]
+        return None
 
     async def add_api_key(self, discord_id: int, canvas_base_url: str, token: str):
-        # find internal DB user id from discord id
+        """
+        Store a Canvas API token for a Discord user.
+
+        First looks up the internal database user ID associated
+        with the given Discord ID. If the user exists, their Canvas
+        credentials are inserted into the canvas_credentials table.
+
+        :param discord_id: Discord snowflake ID of the user.
+        :type discord_id: int
+        :param canvas_base_url: Base URL of the user's Canvas instance.
+        :type canvas_base_url: str
+        :param token: Canvas personal access token.
+        :type token: str
+        """
+        # Find the internal database user ID from the Discord ID.
         cursor = await self.db.execute(
             """
             SELECT 1 
@@ -165,6 +235,14 @@ class DBHandler:
             print("Error: could not user with that discord ID!")
 
     async def user_exists(self, discord_id: int) -> bool:
+        """
+        Check whether a Discord user exists in the database.
+
+        :param discord_id: Discord snowflake ID of the user.
+        :type discord_id: int
+        :return: True if the user exists, otherwise False.
+        :rtype: bool
+        """
         cursor = await self.db.execute(
             """
             SELECT 1 
@@ -178,6 +256,16 @@ class DBHandler:
         return await cursor.fetchone() is not None
 
     async def create_user(self, discord_id: int, display_name: str):
+        """
+        Create a new Discord user in the database.
+
+        :param discord_id: Discord snowflake ID of the user.
+        :type discord_id: int
+        :param display_name: Display name associated with the Discord user.
+        :type display_name: str
+        :return: The ID assigned to the newly created record.
+        :rtype: int
+        """
         cursor = await self.db.execute(
             """
             INSERT INTO users (discord_id, display_name, created_at)
