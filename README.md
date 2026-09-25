@@ -1,5 +1,5 @@
-# Nudgebot
-**Nudgebot** is a Discord bot designed to help students stay organized and keep track of their coursework. The bot connects a class Discord server with Canvas to provide students with assignment information, reminders, and other useful course updates directly through Discord.
+# NudgeBot
+**NudgeBot** is a Discord bot designed to help students stay organized and keep track of their coursework. The bot connects a class Discord server with Canvas to provide students with assignment information, reminders, and other useful course updates directly through Discord.
 
 The goal of the bot is to make it easier for students to manage assignments and communicate with classmates without constantly switching between Discord and Canvas. 
 
@@ -44,7 +44,7 @@ A public bot invite link will not be provided while the project is in its curren
 #### Requirements
 - Python 3.x
 - A Discord application and bot
-- A dDiscord development server
+- A Discord development server
 - A Canvas account with permissions to generate API keys
 - Git
 
@@ -61,13 +61,14 @@ The project currently uses the following libraries:
 
 #### Environment Variables
 Create a copy of the `.env-example` file and rename it to `.env`. 
+  
+The `.env-example` file is the template for the environment variables required to run the bot. Do not commit your `.env` file as it contains sensitive credentials.
 
 The .env file should contain the configuration required to run the bot:  
 ```
 TOKEN=discord_bot_token  
 GUILD_ID=discord_server_id  
 ```
-
 Copy the token from the Discord Developer Portal > Applications > NudgeBot > Bot and paste it in for the `TOKEN` environment variable.
 
 Do not commit .env or any other file containing sensitive credentials to the repository.
@@ -112,7 +113,7 @@ For example:
 `feat/courses`
 
 ### Bug Fixes
-Bugs should receive their own branch using
+Bugs should receive their own branch using:  
 `bug/<bug-name-or-backlog-ID>`
 
 For example:  
@@ -161,7 +162,7 @@ Originally written for the CS-3203 Software Engineering class at the University 
 Group K: Luke Sewell, Janes Le, Daniel Brown.
 
 ## License
-Copyright 2026 Luke Sewell, Janes Le, Daniel Brown.
+Copyright 2026. All rights reserved. Luke Sewell, Janes Le, Daniel Brown.
 
 This repository is publicly available for course related review and collaboration. No open source license is currently granted.
 
