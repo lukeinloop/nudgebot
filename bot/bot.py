@@ -87,7 +87,7 @@ async def link(interaction: discord.Interaction):
     )
 
     await interaction.response.send_message(
-        "Please check your DMs for further instructions!"
+        "Please check your DMs for further instructions!", ephemeral=True
     )
 
 
