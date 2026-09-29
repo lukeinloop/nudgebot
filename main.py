@@ -15,7 +15,7 @@ from bot.bot import client
 from database.backend import DBHandler
 
 
-def main():
+def main() -> None:
     """
     Initialize the database and start NudgeBot.
 
