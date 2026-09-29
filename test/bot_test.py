@@ -5,7 +5,7 @@ import discord
 from bot.bot import NudgeBot
 
 
-class TestBackend(unittest.TestCase):
+class TestBot(unittest.TestCase):
     def setUp(self):
         super().setUp()
 

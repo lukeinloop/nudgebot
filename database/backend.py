@@ -181,7 +181,9 @@ class DBHandler:
             return str(token[9])
         return None
 
-    async def add_api_key(self, discord_id: int, canvas_base_url: str, token: str) -> None:
+    async def add_api_key(
+        self, discord_id: int, canvas_base_url: str, token: str
+    ) -> None:
         """
         Store a Canvas API token for a Discord user.
 
