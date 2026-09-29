@@ -25,4 +25,4 @@ jobs:
               run: mypy ./main.py --warn-redundant-casts --warn-unused-ignores --warn-return-any --disallow-untyped-calls --check-untyped-defs --no-incremental
             
             - name: Unit Tests
-              run: python -m unittest discover -p "*test.py" test
+              run: python -m unittest discover -p "*test.py" -v test
