@@ -43,6 +43,14 @@ class DBHandler:
         self.db = await aiosqlite.connect(self.db_path)
         await self.db.execute("PRAGMA foreign_keys = ON")
 
+    async def close(self) -> None:
+        """
+        Safely close the connection to the SQLite database.
+
+        Make sure to call when the program ends to release resources correctly.
+        """
+        await self.db.close()
+
     async def initialize_db(self) -> None:
         """
         Initialize the database schema.
