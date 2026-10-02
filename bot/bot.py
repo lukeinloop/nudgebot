@@ -9,6 +9,8 @@ import httpx
 
 from database.backend import DBHandler
 
+from bot.assignment_reminders import check_assignment_reminders
+
 class NudgeBot(discord.Client):
     """
     Discord client for NudgeBot.
@@ -159,7 +161,20 @@ async def assignments(
     days: app_commands.Range[int, 1, 60] = 7,
     course: Optional[str] = None,
 ):
-    """Retrieve and display upcoming Canvas assignments."""
+    """
+    Retrieve and display the user's upcoming Canvas assignments.
+
+    The user's stored Canvas API key is used to retrieve upcoming
+    assignments from Canvas. Assignments are filtered by the specified
+    number of days and can optionally be filtered by course.
+
+    :param interaction: The Discord interaction that triggered the command.
+    :type interaction: discord.Interaction
+    :param days: Number of days ahead to show upcoming assignments.
+    :type days: int
+    :param course: Optional course name used to filter assignments.
+    :type course: str | None
+    """
 
     await interaction.response.defer(ephemeral=True)
 
@@ -343,6 +358,68 @@ async def assignments_course_autocomplete(
     except Exception as e:
         print(f"Course autocomplete error: {e}")
         return []
+
+
+# Reminders command to enable assignment reminders
+@client.tree.command()
+@app_commands.describe(
+    hours="Number of hours before an assignment is due to send a reminder"
+)
+async def reminders(
+    interaction: discord.Interaction,
+    hours: app_commands.Range[int, 1, 168] = 24,
+):
+    """Enable Canvas assignment reminders."""
+
+    # Make sure the user has linked their Canvas account
+    api_key = await client.db.get_api_key(interaction.user.id)
+
+    if not api_key:
+        await interaction.response.send_message(
+            "You haven't linked your Canvas account yet. Use /link to get started.",
+            ephemeral=True,
+        )
+        return
+
+    success = await client.db.enable_reminders(
+        interaction.user.id,
+        hours,
+    )
+
+    if not success:
+        await interaction.response.send_message(
+            "Could not enable reminders.",
+            ephemeral=True,
+        )
+        return
+
+    await interaction.response.send_message(
+        f"Assignment reminders enabled! I'll remind you {hours} hours before an assignment is due.",
+        ephemeral=True,
+    )
+
+# Temporary command for testing assignment reminders
+@client.tree.command()
+async def test_reminders(interaction: discord.Interaction):
+    """Manually check Canvas for assignment reminders."""
+
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        await check_assignment_reminders(client)
+
+        await interaction.followup.send(
+            "Reminder check complete. Check the terminal for results.",
+            ephemeral=True,
+        )
+
+    except Exception as e:
+        print(f"Test reminder error: {e}")
+
+        await interaction.followup.send(
+            "An error occurred while checking reminders.",
+            ephemeral=True,
+        )
 
 # !!! THIS IS ONLY FOR INTERACTING IN DMS !!!
 # !!! EVERYTHING ELSE SHOULD BE HANDLED THROUGH A SLASH COMMAND !!!
