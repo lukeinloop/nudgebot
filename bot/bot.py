@@ -1,6 +1,6 @@
 # this file was modified from: https://github.com/Rapptz/discord.py/blob/v2.7.1/examples/app_commands/basic.py
 
-from typing import Optional
+from typing import Mapping, Optional
 
 import discord
 from discord import app_commands
@@ -28,8 +28,8 @@ class NudgeBot(discord.Client):
         """
         super().__init__(intents=intents)
 
-        self.guild_id: None | discord.Object = None
-        self.db: DBHandler = None
+        self.guild_id: discord.Object
+        self.db: DBHandler
 
         self.tree = app_commands.CommandTree(self)
 
@@ -59,8 +59,11 @@ async def on_ready():
 
     This event prints NudgeBot's username and Discord ID to the console.
     """
-    print(f"Logged in as {client.user} (ID: {client.user.id})")
-    print("------")
+    if client.user is not None:
+        print(f"Logged in as {client.user} (ID: {client.user.id})")
+        print("------")
+    else:
+        print("Failed to connect!")
 
 
 # Link command to get and store canvas API token
@@ -118,7 +121,7 @@ async def courses(interaction: discord.Interaction):
 
     url = "https://canvas.ou.edu/api/v1/courses"
     headers = {"Authorization": f"Bearer {api_key}"}
-    params = {"per_page": 20, "enrollment_state": "active"}
+    params: Mapping = {"per_page": 20, "enrollment_state": "active"}
 
     try:
         # async client since discord.py is asynchronous
