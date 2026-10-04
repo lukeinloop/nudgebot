@@ -48,7 +48,7 @@ class NudgeBot(discord.Client):
         await self.tree.sync(guild=self.guild_id)
 
 
-intents = discord.Intents.all()
+intents = discord.Intents(guilds=True, messages=True, members=True, message_content=True)
 client = NudgeBot(intents=intents)
 
 
