@@ -315,7 +315,19 @@ async def assignments_course_autocomplete(
     interaction: discord.Interaction,
     current: str,
 ) -> list[app_commands.Choice[str]]:
+    """
+    Provide course name suggestions for the assignments command.
 
+    Retrieves the user's active Canvas courses and filters the course
+    names based on the text currently entered by the user.
+
+    :param interaction: The Discord interaction that triggered the autocomplete.
+    :type interaction: discord.Interaction
+    :param current: The current text entered in the course option.
+    :type current: str
+    :return: A list of matching Canvas course choices.
+    :rtype: list[app_commands.Choice[str]]
+    """
     api_key = await client.db.get_api_key(interaction.user.id)
 
     if not api_key:
