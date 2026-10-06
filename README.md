@@ -160,6 +160,7 @@ A production implementation would require at least:
 
 ## Authors and acknowledgment
 Originally written for the CS-3203 Software Engineering class at the University of Oklahoma in Fall 2026.
+
 Group K: Luke Sewell, Janes Le, Daniel Brown.
 
 ## License
