@@ -37,7 +37,7 @@ def main() -> None:
     load_dotenv()
 
     # initialize DB
-    db = DBHandler(os.environ["DB_PATH"])
+    db = DBHandler(os.environ["DB_PATH"], os.environ["KEY_PATH"])
     asyncio.run(db.connect())
     asyncio.run(db.initialize_db())
 

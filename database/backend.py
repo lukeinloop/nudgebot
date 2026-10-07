@@ -19,6 +19,8 @@ import aiosqlite
 
 import time
 
+from cryptography.fernet import Fernet
+
 
 class DBHandler:
     """
@@ -31,7 +33,7 @@ class DBHandler:
     :type db_path: str
     """
 
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, key_path: str):
         """
         Initialize database handler.
 
@@ -40,6 +42,20 @@ class DBHandler:
         """
         self.db_path = db_path
         self.db: aiosqlite.Connection
+
+        # look for existing encryption key
+        self.encryption_key: bytes
+        try:
+            with open(key_path, "rb") as key:
+                self.encryption_key = key.read()
+        # if there is no existing key, make a new one
+        except FileNotFoundError as e:
+            print("Existing encryption key not found, generating new one...")
+            with open(key_path, "wb") as key:
+                new_key = Fernet.generate_key()
+                key.write(new_key)
+
+                self.encryption_key = new_key
 
     async def connect(self) -> None:
         """
@@ -194,7 +210,7 @@ class DBHandler:
 
         token = await cursor.fetchone()
         if token is not None:
-            return str(token[9])
+            return Fernet(self.encryption_key).decrypt(token[9]).decode("UTF-8")
         return None
 
     async def add_api_key(
@@ -244,7 +260,7 @@ class DBHandler:
                     user_id,
                     canvas_base_url,
                     "personal token",
-                    token,
+                    Fernet(self.encryption_key).encrypt(token.encode("UTF-8")),
                     time.time(),
                 ),
             )
