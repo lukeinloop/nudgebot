@@ -125,8 +125,9 @@ Once a feature or bug fix is complete:
 1. Push the branch to the repository 
 2. Open a pull request targeting main
 3. Ensure the changes are formatted and tested
-4. Request a code review
-5. Merge the pull request once the review process has been completed
+4. Wait and see if unit tests pass
+5. Request a code review
+6. Merge the pull request once the review process has been completed
 
 ### Code Formatting 
 This project uses the [Black Python formatter](https://pypi.org/project/black/).
@@ -159,6 +160,7 @@ A production implementation would require at least:
 
 ## Authors and acknowledgment
 Originally written for the CS-3203 Software Engineering class at the University of Oklahoma in Fall 2026.
+
 Group K: Luke Sewell, Janes Le, Daniel Brown.
 
 ## License

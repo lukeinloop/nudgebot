@@ -1,4 +1,12 @@
 """
+NudgeBot: Canvas Integration / Discord Bot
+
+Originally written for the CS-3203 Software Engineering class at the University of Oklahoma in Fall 2026.
+
+Copyright 2026 Group K: Luke Sewell, Janes Le, Daniel Brown. Not open source. All rights reserved.
+"""
+
+"""
 Database access and initialization utilities for NudgeBot.
 
 This module provides the :class:`DBHandler` class which manages the
@@ -31,9 +39,9 @@ class DBHandler:
         :type db_path: str
         """
         self.db_path = db_path
-        self.db: aiosqlite.Connection = None
+        self.db: aiosqlite.Connection
 
-    async def connect(self):
+    async def connect(self) -> None:
         """
         Establish a connection to the SQLite database.
 
@@ -43,7 +51,15 @@ class DBHandler:
         self.db = await aiosqlite.connect(self.db_path)
         await self.db.execute("PRAGMA foreign_keys = ON")
 
-    async def initialize_db(self):
+    async def close(self) -> None:
+        """
+        Safely close the connection to the SQLite database.
+
+        Make sure to call when the program ends to release resources correctly.
+        """
+        await self.db.close()
+
+    async def initialize_db(self) -> None:
         """
         Initialize the database schema.
 
@@ -152,7 +168,7 @@ class DBHandler:
         )
 
     # Checks the "users" table for the given discord user ID
-    async def get_api_key(self, discord_id: int) -> None | str:
+    async def get_api_key(self, discord_id: int) -> str | None:
         """
         Retrieve the Canvas API token for a Discord user.
 
@@ -178,10 +194,12 @@ class DBHandler:
 
         token = await cursor.fetchone()
         if token is not None:
-            return token[9]
+            return str(token[9])
         return None
 
-    async def add_api_key(self, discord_id: int, canvas_base_url: str, token: str):
+    async def add_api_key(
+        self, discord_id: int, canvas_base_url: str, token: str
+    ) -> None:
         """
         Store a Canvas API token for a Discord user.
 
@@ -255,7 +273,7 @@ class DBHandler:
 
         return await cursor.fetchone() is not None
 
-    async def create_user(self, discord_id: int, display_name: str):
+    async def create_user(self, discord_id: int, display_name: str) -> int | None:
         """
         Create a new Discord user in the database.
 
