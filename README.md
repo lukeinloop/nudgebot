@@ -58,6 +58,7 @@ The project currently uses the following libraries:
 - discord.py
 - httpx
 - python-dotenv
+- cryptography
 
 #### Environment Variables
 Create a copy of the `.env-example` file and rename it to `.env`. 
@@ -68,6 +69,8 @@ The .env file should contain the configuration required to run the bot:
 ```
 TOKEN=discord_bot_token  
 GUILD_ID=discord_server_id  
+DB_PATH=path_to_sqlite_database.db/.sqlite
+KEY_PATH=path_to_encryption_key_file_.key
 ```
 Copy the token from the Discord Developer Portal > Applications > NudgeBot > Bot and paste it in for the `TOKEN` environment variable.
 
@@ -142,7 +145,7 @@ Contributions should be formatted with Black before being merged into the main b
 NudgeBot is currently not suitable for handling real user credentials or sensitive information. 
   
 Known limitations include:  
-- Canvas API tokens are not stored using production grade encryption.
+- While Canvas API tokens are encrypted before stored, they are passed in plaintext to the application (Discord is unencrypted) and the key file is stored locally and unprotected.
 - Application has not undergone a formal security audit
 - The current database deployment is meant for development rather than production deployment
   

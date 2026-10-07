@@ -17,7 +17,7 @@ class TestBackend(unittest.TestCase):
     def setUp(self):
         super().setUp()
 
-        self.db = DBHandler("./test_database.sqlite")
+        self.db = DBHandler("./test_database.sqlite", "./test_key")
         asyncio.run(self.db.connect())
         asyncio.run(self.db.initialize_db())
 
