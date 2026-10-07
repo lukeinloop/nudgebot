@@ -5,3 +5,7 @@
 
 # don't commit the database!
 *.sqlite
+*.db
+
+# encryption keys!
+*.key
