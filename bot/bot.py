@@ -8,9 +8,8 @@ Copyright 2026 Group K: Luke Sewell, Janes Le, Daniel Brown. Not open source. Al
 
 # this file was modified from: https://github.com/Rapptz/discord.py/blob/v2.7.1/examples/app_commands/basic.py
 
-from typing import Optional
 from datetime import datetime, timedelta, timezone
-from typing import Mapping, Optional
+from typing import Optional
 
 import discord
 from discord import app_commands
@@ -130,7 +129,10 @@ async def courses(interaction: discord.Interaction):
 
     url = "https://canvas.ou.edu/api/v1/courses"
     headers = {"Authorization": f"Bearer {api_key}"}
-    params: Mapping = {"per_page": 20, "enrollment_state": "active"}
+    params: dict[str, str | int] = {
+    "per_page": 20,
+    "enrollment_state": "active"
+}
 
     try:
         # async client since discord.py is asynchronous
@@ -202,9 +204,9 @@ async def assignments(
     headers = {"Authorization": f"Bearer {api_key}"}
 
     courses_url = "https://canvas.ou.edu/api/v1/courses"
-    courses_params = {
-        "per_page": 100,
-        "enrollment_state": "active",
+    courses_params: dict[str, str | int] = {
+    "per_page": 100,
+    "enrollment_state": "active",
     }
 
     try:
