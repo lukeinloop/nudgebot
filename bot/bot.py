@@ -204,10 +204,10 @@ async def assignments(
     headers = {"Authorization": f"Bearer {api_key}"}
 
     courses_url = "https://canvas.ou.edu/api/v1/courses"
-    courses_params: dict[str, str | int] = {
-    "per_page": 100,
+    courses_params: httpx.QueryParams = httpx.QueryParams({
+    "per_page": "100",
     "enrollment_state": "active",
-    }
+    })
 
     try:
         async with httpx.AsyncClient() as http_client:
@@ -347,9 +347,9 @@ async def assignments_course_autocomplete(
 
     url = "https://canvas.ou.edu/api/v1/courses"
     headers = {"Authorization": f"Bearer {api_key}"}
-    params = {
-        "per_page": 100,
-        "enrollment_state": "active",
+    params: dict[str, str] = {
+    "per_page": "100",
+    "enrollment_state": "active",
     }
 
     try:
