@@ -8,14 +8,14 @@ Copyright 2026 Group K: Luke Sewell, Janes Le, Daniel Brown. Not open source. Al
 
 # this file was modified from: https://github.com/Rapptz/discord.py/blob/v2.7.1/examples/app_commands/basic.py
 
-from typing import Mapping, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 import discord
 from discord import app_commands
 import httpx
 
 from database.backend import DBHandler
-
 
 class NudgeBot(discord.Client):
     """
@@ -129,7 +129,10 @@ async def courses(interaction: discord.Interaction):
 
     url = "https://canvas.ou.edu/api/v1/courses"
     headers = {"Authorization": f"Bearer {api_key}"}
-    params: Mapping = {"per_page": 20, "enrollment_state": "active"}
+    params: dict[str, str | int] = {
+    "per_page": 20,
+    "enrollment_state": "active"
+}
 
     try:
         # async client since discord.py is asynchronous
@@ -160,6 +163,225 @@ async def courses(interaction: discord.Interaction):
     except Exception:
         await interaction.followup.send("An unexpected error occurred.", ephemeral=True)
 
+# Assignments command to get upcoming Canvas assignments
+@client.tree.command()
+@app_commands.describe(days="Number of days ahead to show assignments",
+                       course="Course name to filter assignments by",
+)
+async def assignments(
+    interaction: discord.Interaction,
+    days: app_commands.Range[int, 1, 60] = 7,
+    course: Optional[str] = None,
+):
+    """
+    Retrieve and display the user's upcoming Canvas assignments.
+
+    The user's stored Canvas API key is used to retrieve upcoming
+    assignments from Canvas. Assignments are filtered by the specified
+    number of days and can optionally be filtered by course.
+
+    :param interaction: The Discord interaction that triggered the command.
+    :type interaction: discord.Interaction
+    :param days: Number of days ahead to show upcoming assignments.
+    :type days: int
+    :param course: Optional course name used to filter assignments.
+    :type course: str | None
+    """
+
+    await interaction.response.defer(ephemeral=True)
+
+    # Get the user's Canvas API key
+    api_key = await client.db.get_api_key(interaction.user.id)
+
+    if not api_key:
+        await interaction.followup.send(
+            "You haven't linked your Canvas account yet. Use /link to get started.",
+            ephemeral=True,
+        )
+        return
+
+    url = "https://canvas.ou.edu/api/v1/users/self/upcoming_events"
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    courses_url = "https://canvas.ou.edu/api/v1/courses"
+    courses_params: httpx.QueryParams = httpx.QueryParams({
+    "per_page": "100",
+    "enrollment_state": "active",
+    })
+
+    try:
+        async with httpx.AsyncClient() as http_client:
+            # Get upcoming assignments
+            response = await http_client.get(url, headers=headers)
+            response.raise_for_status()
+            events = response.json()
+
+            # Get active courses
+            courses_response = await http_client.get(
+                courses_url,
+                headers=headers,
+                params=courses_params,
+            )
+            courses_response.raise_for_status()
+            courses_data = courses_response.json()
+
+            course_names = {}
+
+        for canvas_course in courses_data:
+            course_id = canvas_course.get("id")
+            course_name = canvas_course.get("name") or canvas_course.get(
+                "course_code", "Unnamed Course"
+            )
+
+            course_names[course_id] = course_name
+
+        now = datetime.now(timezone.utc)
+        end_date = now + timedelta(days=days)
+
+        upcoming_assignments = []
+
+        for event in events:
+            if event.get("type") != "assignment":
+                continue
+
+            assignment = event.get("assignment")
+
+            if not assignment:
+                continue
+
+            due_at = assignment.get("due_at")
+
+            if not due_at:
+                continue
+
+            due_date = datetime.fromisoformat(
+                due_at.replace("Z", "+00:00")
+            )
+
+            if not (now <= due_date <= end_date):
+                continue
+
+            course_id = assignment.get("course_id")
+            course_name = course_names.get(course_id, "Unknown Course")
+
+            # If the user selected a course, only include matching assignments
+            if course and course.lower() not in course_name.lower():
+                continue
+
+            upcoming_assignments.append(
+                (due_date, assignment, course_name)
+            )
+
+        upcoming_assignments.sort(key=lambda item: item[0])
+
+        if not upcoming_assignments:
+            await interaction.followup.send(
+                f"No assignments due in the next {days} days.",
+                ephemeral=True,
+            )
+            return
+
+        if course:
+            heading = f"**Upcoming {course} assignments - next {days} days**\n"
+        else: 
+            heading = f"**Upcoming assignments - next {days} days**\n"
+
+        message_lines = [heading]
+
+        for due_date, assignment, course_name in upcoming_assignments:
+            name = assignment.get("name", "Unnamed Assignment")
+            assignment_url = assignment.get("html_url")
+
+            timestamp = int(due_date.timestamp())
+
+            message_lines.append(
+                f"**{name}**\n"
+                f"Course: `{course_name}`\n"
+                f"Due: <t:{timestamp}:F> (<t:{timestamp}:R>)\n"
+                f"[Open in Canvas]({assignment_url})"
+            )
+
+        await interaction.followup.send(
+            "\n\n".join(message_lines),
+            ephemeral=True,
+        )
+
+    except httpx.HTTPStatusError as e:
+        await interaction.followup.send(
+            f"Failed to retrieve assignments. "
+            f"Canvas API returned error status: {e.response.status_code}",
+            ephemeral=True,
+        )
+
+    except Exception as e:
+        print(f"Assignments error: {e}")
+
+        await interaction.followup.send(
+            "An unexpected error occurred while retrieving assignments.",
+            ephemeral=True,
+        )
+
+# Autocomplete function for assigments command
+@assignments.autocomplete("course")
+async def assignments_course_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> list[app_commands.Choice[str]]:
+    """
+    Provide course name suggestions for the assignments command.
+
+    Retrieves the user's active Canvas courses and filters the course
+    names based on the text currently entered by the user.
+
+    :param interaction: The Discord interaction that triggered the autocomplete.
+    :type interaction: discord.Interaction
+    :param current: The current text entered in the course option.
+    :type current: str
+    :return: A list of matching Canvas course choices.
+    :rtype: list[app_commands.Choice[str]]
+    """
+    api_key = await client.db.get_api_key(interaction.user.id)
+
+    if not api_key:
+        return []
+
+    url = "https://canvas.ou.edu/api/v1/courses"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    params: dict[str, str] = {
+    "per_page": "100",
+    "enrollment_state": "active",
+    }
+
+    try:
+        async with httpx.AsyncClient() as http_client:
+            response = await http_client.get(
+                url,
+                headers=headers,
+                params=params,
+            )
+            response.raise_for_status()
+            courses_data = response.json()
+
+        choices = []
+
+        for canvas_course in courses_data:
+            course_name = canvas_course.get("name") or canvas_course.get(
+                "course_code", "Unnamed Course"
+            )
+
+            if current.lower() in course_name.lower():
+                choices.append(
+                    app_commands.Choice(
+                        name=course_name[:100],
+                        value=course_name,
+                    )
+                )
+
+        return choices[:25]
+
+    except Exception as e:
+        print(f"Course autocomplete error: {e}")
+        return []
 
 # !!! THIS IS ONLY FOR INTERACTING IN DMS !!!
 # !!! EVERYTHING ELSE SHOULD BE HANDLED THROUGH A SLASH COMMAND !!!
