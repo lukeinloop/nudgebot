@@ -55,6 +55,10 @@ class NudgeBot(discord.Client):
         self.tree.copy_global_to(guild=self.guild_id)
         await self.tree.sync(guild=self.guild_id)
 
+    async def poll_for_announcements(self):
+        #TODO figure out how we're going to do this
+        pass
+
 
 intents = discord.Intents(guilds=True, messages=True, members=True, message_content=True)
 client = NudgeBot(intents=intents)
