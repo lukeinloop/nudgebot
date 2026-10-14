@@ -186,3 +186,16 @@ This repository is publicly available for course related review and collaboratio
 Unless a license is added to this repository, the source code should not be assumed to be available for reuse, modification, or redistribution.  
   
 If the project team and course instructor decide to release the project under an open source license later on, the appropriate license will be added here.
+## CI/CD
+
+**CI** (`.github/workflows/unit-tests.yml`): GitHub Actions runs `mypy` and the unit tests on every pull request to `main` and on every push to `main`.
+
+**CD** (`deploy/`): the host (a DietPi device) runs `nudge-bot-deploy.timer` every 2 minutes. It runs `deploy/deploy.sh`, which fetches `origin/main`, and if there are new commits it fast-forwards, installs `requirements.txt`, restarts the `nudge-bot` systemd service and checks the service is still running. If any step fails the checkout is rolled back so the next run retries.
+
+Setup on the host:
+```
+sudo cp deploy/systemd/*.service deploy/systemd/*.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now nudge-bot nudge-bot-deploy.timer
+```
+`dietpi` also needs passwordless sudo for `systemctl restart nudge-bot`. Require the "Unit Tests" check on `main` in GitHub branch protection so only tested code is deployed.

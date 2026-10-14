@@ -5,4 +5,4 @@ Description=Deploy NudgeBot from GitHub
 Type=oneshot
 User=dietpi
 WorkingDirectory=/home/dietpi/nudgebot
-ExecStart=/home/dietpi/nudgebot/deploy/deploy.sh
+ExecStart=/bin/bash /home/dietpi/nudgebot/deploy/deploy.sh

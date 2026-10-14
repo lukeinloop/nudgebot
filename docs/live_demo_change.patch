@@ -1,0 +1,50 @@
+--- a/submission_status.py	2026-10-13 22:46:18.611878224 -0500
++++ b/submission_status.py	2026-10-13 22:46:26.326249271 -0500
+@@ -48,3 +48,19 @@
+     if submitted_at <= due:
+         return "submitted"
+     return "late"
++
++
++def hours_late(assignment: Mapping[str, Any] | None) -> float:
++    """
++    Get how many hours after the deadline an assignment was submitted.
++
++    :param assignment: Same format as submission_status().
++    :type assignment: Mapping[str, Any] | None
++    :return: Hours late, or 0.0 if the assignment is on time or not submitted.
++    :rtype: float
++    """
++    if assignment is None or submission_status(assignment) != "late":
++        return 0.0
++
++    delta = assignment["submitted_at"] - assignment["due"]
++    return float(delta.total_seconds() / 3600)
+--- a/test/submission_status_test.py	2026-10-13 22:46:18.654561500 -0500
++++ b/test/submission_status_test.py	2026-10-13 22:46:18.669034322 -0500
+@@ -9,7 +9,7 @@
+ import unittest
+ from datetime import datetime, timedelta, timezone
+ 
+-from submission_status import submission_status
++from submission_status import hours_late, submission_status
+ 
+ 
+ class TestSubmissionStatus(unittest.TestCase):
+@@ -40,6 +40,16 @@
+         assignment = {"due": self.deadline, "submitted_at": self.deadline + timedelta(seconds=1)}
+         self.assertEqual(submission_status(assignment), "late")
+ 
++    def test_hours_late_after_deadline(self):
++        assignment = {"due": self.deadline, "submitted_at": self.deadline + timedelta(hours=3)}
++        self.assertEqual(hours_late(assignment), 3.0)
++
++    def test_hours_late_on_time_or_missing(self):
++        on_time = {"due": self.deadline, "submitted_at": self.deadline}
++        missing = {"due": self.deadline, "submitted_at": None}
++        self.assertEqual(hours_late(on_time), 0.0)
++        self.assertEqual(hours_late(missing), 0.0)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
