@@ -15,6 +15,8 @@ the database connection, creating the required tables, and performing
 user and Canvas credential operations.
 """
 
+from typing import List
+
 import aiosqlite
 
 import time
@@ -183,6 +185,21 @@ class DBHandler:
             ")"
         )
 
+        # Where to poll for canvas announcements and where to send them
+        await self.db.execute(
+            "CREATE TABLE IF NOT EXISTS announcements ("
+            "announcement_id INTEGER PRIMARY KEY,"
+            "user_id INTEGER NOT NULL,"
+            "course_id INTEGER NOT NULL,"
+            "guild_id INTEGER NOT NULL,"
+            "channel_id INTEGER NOT NULL,"
+            "ping BOOLEAN DEFAULT TRUE,"
+            "last_checked TIMESTAMP,"
+            "FOREIGN KEY(user_id) REFERENCES users(user_id),"
+            "FOREIGN KEY(course_id) REFERENCES courses(course_id)"
+            ")"
+        )
+
     # Checks the "users" table for the given discord user ID
     async def get_api_key(self, discord_id: int) -> str | None:
         """
@@ -310,3 +327,50 @@ class DBHandler:
         await self.db.commit()
 
         return cursor.lastrowid
+
+    async def get_user(self, discord_id: int) -> aiosqlite.Row | None:
+        """
+        Get a user's information from the database by their discord user ID.
+
+        :param discord_id: Discord snowflake ID of the user.
+        :type discord_id: int
+        :return: The user's row from the database, if they exist. None if they do not.
+        :rtype: aiosqlite.Row
+        """
+
+        cursor = await self.db.execute(
+            """
+            SELECT 1 
+            FROM users u
+            WHERE u.discord_id = ?
+            LIMIT 1
+            """,
+            (discord_id,),
+        )
+
+        return await cursor.fetchone()
+
+    async def setup_announcement(
+        self, user_id: int, discord_server_id: int, discord_channel_id: int, ping: bool
+    ) -> int | None:
+        """
+        TODO: docstring
+        """
+
+        # TODO: input validation
+
+        # TODO: actually find the user and everything
+
+        cursor = await self.db.execute("TODO")
+        await self.db.commit()
+
+        return cursor.lastrowid
+
+    async def get_announcements(self) -> List[aiosqlite.Row]:
+        # TODO: docstring
+
+        # TODO: for every row in announcements table
+        # return it?
+        # FIXME I don't like how big this might eventually get, maybe figure a better way to split it up?
+
+        return []
