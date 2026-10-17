@@ -388,6 +388,48 @@ async def assignments_course_autocomplete(
         print(f"Course autocomplete error: {e}")
         return []
 
+@client.tree.command()
+@app_commands.describe(
+    course_id="Canvas course ID to pull announcements from",
+    channel="Discord channel to send announcements in (defaults to current channel)",
+    ping="Whether to @everyone for announcements or not."
+)
+async def setup_announcements(interaction: discord.Interaction, course_id: int, channel: discord.TextChannel, ping=True) -> bool:
+    #TODO docstring
+    
+    if interaction.guild is None:
+        await interaction.response.send_message("Not in server! Cannot set up announcements!", ephemeral=True)
+        return False
+
+    # check that the channel exists
+    if channel not in interaction.guild.channels:
+        await interaction.response.send_message("Channel does not exist! Cannont set up announcements!", ephemeral=True)
+        return False
+
+    # check that the bot has permissions for the channel
+    #TODO
+
+    # find user by their discord ID
+    user = await client.db.get_user(interaction.user.id)
+
+    if user is None:
+        await interaction.response.send_message("You don't have your canvas credentials linked! Please use /link and try again!", ephemeral=True)
+        return False
+
+    # check that the user is actually in the course
+    #TODO
+
+    # check that they are a professor
+    #TODO
+
+    # make an entry in the table for poll_for_announcement() to grab
+    await client.db.setup_announcement(user[1], interaction.guild.id, channel.id, ping)
+
+    await interaction.response.send_message(f"Announcements successfully set up for course: {course_name} in channel: {channel.name}!", ephemeral=True)
+    return True
+
+#TODO autocomplete for setup_announcements
+
 # !!! THIS IS ONLY FOR INTERACTING IN DMS !!!
 # !!! EVERYTHING ELSE SHOULD BE HANDLED THROUGH A SLASH COMMAND !!!
 @client.event
