@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import discord
-from discord import app_commands
+from discord import Permissions, app_commands
 import httpx
 
 from database.backend import DBHandler
@@ -395,7 +395,21 @@ async def assignments_course_autocomplete(
     ping="Whether to @everyone for announcements or not."
 )
 async def setup_announcements(interaction: discord.Interaction, course_id: int, channel: discord.TextChannel, ping=True) -> bool:
-    #TODO docstring
+    """
+    Configure Canvas announcement notifications.
+
+    The bot will periodically poll Canvas for new announcements and send them in the configured channels.
+    Must be a professor to configure the announcements. Returns a boolean for easier unit testing, since 
+    we are on the unit testing section of the course.
+
+    :param course_id: Canvas ID of the canvas course to track announcements from.
+    :type course_id: int
+    :param channel: Channel to send announcements in. Can be the same channel the command is run, or specify a different channel.
+    :type channel: discord.TextChannel
+    :param ping: whether to @everyone when sending the announcement message.
+    :type ping: bool
+    :rtype: bool        
+    """
     
     if interaction.guild is None:
         await interaction.response.send_message("Not in server! Cannot set up announcements!", ephemeral=True)
@@ -407,7 +421,17 @@ async def setup_announcements(interaction: discord.Interaction, course_id: int, 
         return False
 
     # check that the bot has permissions for the channel
-    #TODO
+    if client.user is None:
+        return False
+    
+    member = channel.guild.get_member(client.user.id)
+    if member is None:
+        await interaction.response.send_message("Discord bot is not in channel! Cannot set up announcements!", ephemeral=True)
+        return False
+
+    send_permission = Permissions(send_messages=True)
+    if send_permission <= channel.permissions_for(member): # if it's a subset of member permisions
+        await interaction.response.send_message("Discord bot does not have permissions for that channel!", ephemeral=True)
 
     # find user by their discord ID
     user = await client.db.get_user(interaction.user.id)
@@ -417,15 +441,23 @@ async def setup_announcements(interaction: discord.Interaction, course_id: int, 
         return False
 
     # check that the user is actually in the course
-    #TODO
-
-    # check that they are a professor
-    #TODO
+    courses = await client.db.get_courses_by_user(user[0])
+    for course in courses:
+        if course[2] == course_id:
+            # they are in this course, check if they are a professor
+            if course[3] == "professor":
+                break # they pass the check
+            else:
+                await interaction.response.send_message(f"You must be a professor to set up announcement tracking! You are not a professor for course: {course_id}", ephemeral=True)
+                return False
+    else:
+        await interaction.response.send_message(f"You must be enrolled in the course to set up announcements! Not enrolled in course: {course_id}", ephemeral=True)
+        return False
 
     # make an entry in the table for poll_for_announcement() to grab
-    await client.db.setup_announcement(user[1], interaction.guild.id, channel.id, ping)
+    await client.db.setup_announcement(user[1], course_id, interaction.guild.id, channel.id, ping)
 
-    await interaction.response.send_message(f"Announcements successfully set up for course: {course_name} in channel: {channel.name}!", ephemeral=True)
+    await interaction.response.send_message(f"Announcements successfully set up for course: {course_id} in channel: {channel.name}!", ephemeral=True)
     return True
 
 #TODO autocomplete for setup_announcements
