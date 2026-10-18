@@ -350,6 +350,28 @@ class DBHandler:
 
         return await cursor.fetchone()
 
+    async def get_courses_by_user(self, user_id: int) -> Iterable[aiosqlite.Row]:
+        """
+        Fetch all courses in the enrollments table for a given user.
+
+        :param user_id: ID of the user from the users table.
+        :type user_id: int
+        :return: All rows in the enrollments table for the user.
+        :rtype: Iterable[aiosqlite.Row]
+        """
+
+        cursor = await self.db.execute(
+            """
+            SELECT *
+            FROM enrollments
+            WHERE enrollments.user_id = ? 
+            LIMIT 50
+            """,
+            (user_id),
+        )
+
+        return await cursor.fetchall()
+
     async def setup_announcement(
         self, user_id: int, discord_server_id: int, discord_channel_id: int, ping: bool
     ) -> int | None:
