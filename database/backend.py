@@ -15,7 +15,7 @@ the database connection, creating the required tables, and performing
 user and Canvas credential operations.
 """
 
-from typing import List
+from typing import Iterable, List
 
 import aiosqlite
 
@@ -373,17 +373,53 @@ class DBHandler:
         return await cursor.fetchall()
 
     async def setup_announcement(
-        self, user_id: int, discord_server_id: int, discord_channel_id: int, ping: bool
+        self,
+        user_id: int,
+        course_id: int,
+        discord_server_id: int,
+        discord_channel_id: int,
+        ping: bool,
     ) -> int | None:
         """
-        TODO: docstring
+        Make an entry in the announcements table that poll_for_announcements() checks when sending Canvas
+        announcements in Discord.
+
+        :param user_id: ID of the user from the users table.
+        :type user_id: int
+        
+        :param course_id: Canvas ID of the canvas course to track announcements from.
+        :type course_id: int
+
+        :param discord_server_id: Discord ID of the server announcements are getting set up there.
+        :type discord_server_id: int
+
+        :param discord_channel_id: Channel ID of the (text) channel where announcements get set up.
+        :type discord_channel_id: int
+
+        :param ping: whether to @everyone when sending the announcement message.
+        :type ping: bool
+
+        :return: All rows in the enrollments table for the user.
+        :rtype: Iterable[aiosqlite.Row]
         """
 
         # TODO: input validation
 
-        # TODO: actually find the user and everything
-
-        cursor = await self.db.execute("TODO")
+        # create new entry
+        cursor = await self.db.execute(
+            """
+            INSERT INTO announcements (user_id, course_id, guild_id, channel_id, ping, last_checked)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                course_id,
+                discord_server_id,
+                discord_channel_id,
+                ping,
+                time.time(),
+            ),
+        )
         await self.db.commit()
 
         return cursor.lastrowid
