@@ -328,6 +328,31 @@ class DBHandler:
 
         return cursor.lastrowid
 
+    async def add_enrollment(self, user_id: int, course_id: int, role: str, discord_server_id: int):
+        """
+        Create a new entry for a user and a course in the enrollments table in the database.
+
+        :param user_id: The internal user ID of the user
+        :type user_id: int
+        :param course_id: The Canvas course ID of the course the user is enrolled in
+        :type course_id: int
+        :param role: One of "student" or "professor" or "TA" 
+        :type role: str
+        :param discord_server_id: Discord Snowflake ID of the server the command was run in.
+        :type discord_server_id: int
+        """
+
+        cursor = await self.db.execute(
+            """
+            INSERT INTO enrollments (user_id, course_id, role, discord_server_id)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, course_id, role, discord_server_id)
+        )
+        await self.db.commit()
+
+        return cursor.lastrowid
+
     async def get_user(self, discord_id: int) -> aiosqlite.Row | None:
         """
         Get a user's information from the database by their discord user ID.
