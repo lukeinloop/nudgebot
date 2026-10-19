@@ -328,6 +328,31 @@ class DBHandler:
 
         return cursor.lastrowid
 
+    async def add_course(self, name: str, code: str, term: str):
+        """
+        Add a Canvas course to the database.
+
+        :param name: Display name of the Canvas course.
+        :type name: str
+        :param code: Unique Canvas code for the course.
+        :type code: str
+        :param term: Semester + Year, ex. "Fa2023", "Sp2027".
+        :type term: str
+        :return: The ID assigned to the newly created record.
+        :rtype: int
+        """
+
+        cursor = await self.db.execute(
+            """
+            INSERT INTO courses (course_name, course_code, term, last_synced_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (name, code, term, time.time()),
+        )
+        await self.db.commit()
+
+        return cursor.lastrowid
+
     async def add_enrollment(self, user_id: int, course_id: int, role: str, discord_server_id: int):
         """
         Create a new entry for a user and a course in the enrollments table in the database.
@@ -411,19 +436,14 @@ class DBHandler:
 
         :param user_id: ID of the user from the users table.
         :type user_id: int
-        
         :param course_id: Canvas ID of the canvas course to track announcements from.
         :type course_id: int
-
         :param discord_server_id: Discord ID of the server announcements are getting set up there.
         :type discord_server_id: int
-
         :param discord_channel_id: Channel ID of the (text) channel where announcements get set up.
         :type discord_channel_id: int
-
         :param ping: whether to @everyone when sending the announcement message.
         :type ping: bool
-
         :return: All rows in the enrollments table for the user.
         :rtype: Iterable[aiosqlite.Row]
         """
