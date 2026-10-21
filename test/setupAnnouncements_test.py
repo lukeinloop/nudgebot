@@ -6,6 +6,7 @@ Originally written for the CS-3203 Software Engineering class at the University 
 Copyright 2026 Group K: Luke Sewell, Janes Le, Daniel Brown. Not open source. All rights reserved.
 """
 
+from pathlib import Path
 from typing import Callable
 import unittest
 import asyncio
@@ -18,6 +19,7 @@ from database.backend import DBHandler
 from bot.bot import intents, NudgeBot, setup_announcements
 
 # FIXME do we need a separate test case for announcement polling?
+DB_PATH = "./test_database.sqlite"
 
 
 class TestSetupAnnouncements(unittest.TestCase):
@@ -26,11 +28,16 @@ class TestSetupAnnouncements(unittest.TestCase):
 
         self.bot = NudgeBot(intents=intents)
 
-        self.db = DBHandler("./test_database.sqlite", "./test_key.key")
+        # delete old test DB if it is still there
+        Path(DB_PATH).unlink(missing_ok=True)
+
+        self.db = DBHandler(DB_PATH, "./test_key.key")
         asyncio.run(self.db.connect())
         asyncio.run(self.db.initialize_db())
 
-        # TODO: make fake discord server
+        # ensure all following INFO prints are on good lines
+        print()
+
         # a lot of this is not documented exactly, as you're not supposed to create these manually,
         # so this had to be stolen from types/guild.py
         self.fake_discord_server = discord.Guild(
@@ -166,7 +173,7 @@ class TestSetupAnnouncements(unittest.TestCase):
             discord.User(
                 state=MagicMock(ConnectionState),
                 data={
-                    "id": 984651321,
+                    "id": 641313,
                     "username": "Test User 2",
                     "discriminator": "testuser31415",
                     "avatar": None,
@@ -185,7 +192,7 @@ class TestSetupAnnouncements(unittest.TestCase):
                     "public_flags": 9999999,
                 },
             ),
-                        discord.User(
+            discord.User(
                 state=MagicMock(ConnectionState),
                 data={
                     "id": 14652312,
@@ -210,50 +217,173 @@ class TestSetupAnnouncements(unittest.TestCase):
         ]
 
         # TODO: make fake interactions
+        self.interaction = discord.Interaction(
+            data={
+                "app_permissions": 2**16,
+                "application_id": 1547277112627429458,  # this one is real
+                # "channel": self.fake_discord_channels[0],
+                "channel_id": self.fake_discord_channels[0].id,
+                "client": None,
+                "command": setup_announcements,
+                "command_failed": False,
+                "command_id": 0,  # TODO FIXME
+                "context": discord.AppCommandContext(
+                    guild=True, dm_channel=True, private_channel=True
+                ),
+                "created_at": None,
+                "custom_id": None,
+                "data": None,
+                "entitlement_sku_ids": [],
+                "entitlements": [],
+                "expires_at": None,
+                "extras": [],
+                "attachment_size_limit": 0,
+                "followup": None,
+                "guild": self.fake_discord_server,
+                "guild_id": self.fake_discord_server.id,
+                "guild_locale": "US",
+                "id": 19846,
+                "locale": "US",
+                "message": {"id": 65749846},
+                "namespace": None,
+                "permissions": [],
+                "response": None,
+                "token": None,
+                "type": None,
+                "user": None,
+                "version": 1,
+            },  # type: ignore
+            state=MagicMock(autospec=ConnectionState, create=True),
+        )
 
-        # insert at least one fake user into the database, as you must
-        # have your canvas credentials linked to use the command
-        asyncio.run(self.db.add_api_key(self.fake_discord_users[0].id, "https://canvas.ou.edu/", "fake_access_token_1"))
-        asyncio.run(self.db.add_api_key(self.fake_discord_users[1].id, "https://canvas.ou.edu/", "fake_access_token_2"))
+        # fake canvas data
+        self.fake_access_tokens = [
+            "fake_token_1",
+            "48749864164898146514w6ef496sef469asf",
+            "85as4f+6asf46e41f65asf"
+        ]
 
-        # TODO: insert/give fake users fake classes 'n Canvas stuff
-        # specifically, in the enrollments table.
-        asyncio.run(self.db.add_enrollment()) # one professor
-        asyncio.run(self.db.add_enrollment()) # one student
+        # ========= set up the test database with fake data =========
+        # create fake users
+        count = 0
+        for fake_discord_user in self.fake_discord_users:
+            ret = asyncio.run(self.db.create_user(fake_discord_user.id, fake_discord_user.name))
+
+            if ret is not None:
+                count += 1
+        print(f"Initialized DB with {count} fake users")
+
+        # give them fake API tokens
+        count = 0
+        for i, fake_discord_user in enumerate(self.fake_discord_users):
+            ret = asyncio.run(self.db.add_api_key(fake_discord_user.id, "https://canvas.ou.edu/", self.fake_access_tokens[i]))
+            print(ret)
+
+            if ret is not None:
+                count += 1
+        print(f"Added {count} fake access tokens")
+
+        # create fake classes (as the enrollments table has a foreign key from the courses table)
+        self.fake_courses = [
+            {
+                "name": "Example Class 1",
+                "course_id": 824691,
+                "term": 34,
+            },
+            {
+                "name": "Example Class 2",
+                "course_id": 130058,
+                "term": 35,
+            },
+            {
+                "name": "Evil Class Eight",
+                "course_id": 116842,
+                "term": 31,
+            },
+            {
+                "name": "Digital Signals and Filtering",
+                "course_id": 157624,
+                "term": 34,
+            },
+        ]
+
+        count = 0
+        for course in self.fake_courses:
+            ret = asyncio.run(
+                self.db.add_course(course["name"], course["course_id"], course["term"])
+            )
+
+            if ret is not None:
+                count += 1
+        print(f"Added {count} fake courses to database!")
+
+        # get internal user IDs (yes we should just make test objects, it can be a PBI)
+        self.fake_user_ids = []
+        for user in self.fake_discord_users:
+            user_row = asyncio.run(self.db.get_user(user.id))
+    
+            if user_row is not None:
+                user_id = user_row[0]
+                self.fake_user_ids.append(user_id)
+        print(f"Found {len(self.fake_user_ids)} users in the database!")
+
+        # insert/give fake users fake classes 'n Canvas stuff, specifically, in the enrollments table.
+        asyncio.run(
+            self.db.add_enrollment(
+                self.fake_user_ids[0],
+                self.fake_courses[0]["course_id"],
+                "professor",
+                self.fake_discord_server.id,
+            )
+        )
+        asyncio.run(
+            self.db.add_enrollment(
+                self.fake_user_ids[0],
+                self.fake_courses[0]["course_id"],
+                "student",
+                self.fake_discord_server.id,
+            )
+        )
+        asyncio.run(
+            self.db.add_enrollment(
+                self.fake_user_ids[1],
+                self.fake_courses[1]["course_id"],
+                "student",
+                self.fake_discord_server.id,
+            )
+        )
+        asyncio.run(
+            self.db.add_enrollment(
+                self.fake_user_ids[1],
+                self.fake_courses[3]["course_id"],
+                "student",
+                self.fake_discord_server.id,
+            )
+        )
+        asyncio.run(
+            self.db.add_enrollment(
+                self.fake_user_ids[1],
+                self.fake_courses[2]["course_id"],
+                "professor",
+                self.fake_discord_server.id,
+            )
+        )
 
     def tearDown(self) -> None:
         super().tearDown()
 
+        print("Teardown ran successfully!")
+
+        Path(DB_PATH).unlink(missing_ok=False)
         asyncio.run(self.db.close())
 
     # === individual method tests below this line ===
     # positive tests
     def test_sendAnnouncementPing(self):
-        setup_announcements.callback(
-            Group, discord.Interaction(), course_id=None, channel=self.fake_discord_channels[0], ping=True
-        )
-        # TODO
-
-    def test_sendAnnouncementNoPing(self):
-        pass
-
-    def test_sendDMAnnouncement(self):
-        pass
-
-    # negative tests
-    def test_sendEmptyAnnouncement(self):
-        pass
-
-    def test_sendTooBigAnnouncement(self):
-        pass
-
-    def test_sendNoPermissionsAnnouncement(self):
-        pass
-
-    def test_sendAnnouncementNoChannel(self):
-        pass
-
-    def test_sendAnnouncementNoUser(self):
+        # setup_announcements.callback(
+        #     Group, discord.Interaction(), course_id=None, channel=self.fake_discord_channels[0], ping=True
+        # )
+        # # TODO
         pass
 
 
