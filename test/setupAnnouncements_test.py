@@ -6,11 +6,14 @@ Originally written for the CS-3203 Software Engineering class at the University 
 Copyright 2026 Group K: Luke Sewell, Janes Le, Daniel Brown. Not open source. All rights reserved.
 """
 
+import json
+from json import dumps as _dumps
+
 from pathlib import Path
 from typing import Callable
 import unittest
 import asyncio
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import discord
 from discord.state import ConnectionState
@@ -21,6 +24,17 @@ from bot.bot import intents, NudgeBot, setup_announcements
 # FIXME do we need a separate test case for announcement polling?
 DB_PATH = "./test_database.sqlite"
 DEBUG = False
+
+
+# patch json module function 'dumps' to work with MagicMock objects
+# as, obviously, we can't alter the code being called for the object in wherever it's getting called.
+# taken from SO answer: https://stackoverflow.com/questions/73989150/how-to-make-a-python-magicmock-object-json-serializable
+def dumps_wrapper(*args, **kwargs):
+    return _dumps(*args, **(kwargs | {"default": lambda obj: "mock"}))
+
+
+json.dumps = MagicMock(wraps=dumps_wrapper)
+patch("json.dumps", MagicMock(wraps=dumps_wrapper))
 
 
 class TestSetupAnnouncements(unittest.TestCase):
