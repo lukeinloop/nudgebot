@@ -19,6 +19,7 @@ import discord
 from discord.state import ConnectionState
 from discord.http import HTTPClient
 from database.backend import DBHandler
+import bot
 from bot.bot import intents, NudgeBot, setup_announcements
 
 # FIXME do we need a separate test case for announcement polling?
@@ -35,6 +36,23 @@ def dumps_wrapper(*args, **kwargs):
 
 json.dumps = MagicMock(wraps=dumps_wrapper)
 patch("json.dumps", MagicMock(wraps=dumps_wrapper))
+
+
+# patch the send_message function, since we aren't actually establishing any HTTP connections
+# this was actually really hard to figure out and it's insane Python allows you to do this
+async def send_message(
+    interaction: discord.interactions.InteractionResponse, msg: str, **kwargs
+):
+    print(f"Sent message: '{msg}' in channel {interaction._parent.channel}")
+
+
+patch.object(
+    discord.interactions.InteractionResponse, "send_message", send_message
+).start()
+
+# also patch the client object in the bot, because obviously it's uninitialized as we don't directly import the module,
+# we only care about the setup_announcements function
+patch.object(bot.bot, "client", create=True).start()  # type: ignore
 
 
 class TestSetupAnnouncements(unittest.TestCase):
@@ -184,7 +202,7 @@ class TestSetupAnnouncements(unittest.TestCase):
                     "flags": 999999999,
                     "premium_type": 0,
                     "public_flags": 9999999,
-                },
+                },  # type: ignore
             ),
             discord.User(
                 state=MagicMock(ConnectionState),
@@ -206,7 +224,7 @@ class TestSetupAnnouncements(unittest.TestCase):
                     "flags": 999999999,
                     "premium_type": 0,
                     "public_flags": 9999999,
-                },
+                },  # type: ignore
             ),
             discord.User(
                 state=MagicMock(ConnectionState),
@@ -228,7 +246,7 @@ class TestSetupAnnouncements(unittest.TestCase):
                     "flags": 999999999,
                     "premium_type": 0,
                     "public_flags": 9999999,
-                },
+                },  # type: ignore
             ),
         ]
 
@@ -263,7 +281,9 @@ class TestSetupAnnouncements(unittest.TestCase):
                 "message": {"id": 65749846},
                 "namespace": None,
                 "permissions": [],
-                "response": None,
+                "response": MagicMock(
+                    autospec=discord.InteractionCallbackResponse, create=True
+                ),
                 "token": None,
                 "type": None,
                 "user": None,
