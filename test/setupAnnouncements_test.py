@@ -276,33 +276,36 @@ class TestSetupAnnouncements(unittest.TestCase):
         # give them fake API tokens
         count = 0
         for i, fake_discord_user in enumerate(self.fake_discord_users):
+            #TODO make add_api_key return something other than None
             ret = asyncio.run(self.db.add_api_key(fake_discord_user.id, "https://canvas.ou.edu/", self.fake_access_tokens[i]))
-            print(ret)
 
-            if ret is not None:
-                count += 1
+            count += 1
         print(f"Added {count} fake access tokens")
 
         # create fake classes (as the enrollments table has a foreign key from the courses table)
         self.fake_courses = [
             {
-                "name": "Example Class 1",
                 "course_id": 824691,
+                "name": "Example Class 1",
+                "code": "EX-2923",
                 "term": 34,
             },
             {
-                "name": "Example Class 2",
                 "course_id": 130058,
+                "name": "Example Class 2",
+                "code": "ECE-2032",
                 "term": 35,
             },
             {
-                "name": "Evil Class Eight",
                 "course_id": 116842,
+                "name": "Evil Class Eight",
+                "code": "CS-3203",
                 "term": 31,
             },
             {
-                "name": "Digital Signals and Filtering",
                 "course_id": 157624,
+                "name": "Digital Signals and Filtering",
+                "code": "MATH-6767",
                 "term": 34,
             },
         ]
@@ -310,7 +313,7 @@ class TestSetupAnnouncements(unittest.TestCase):
         count = 0
         for course in self.fake_courses:
             ret = asyncio.run(
-                self.db.add_course(course["name"], course["course_id"], course["term"])
+                self.db.add_course(course["course_id"], course["name"], course["code"], course["term"])
             )
 
             if ret is not None:
@@ -372,10 +375,10 @@ class TestSetupAnnouncements(unittest.TestCase):
     def tearDown(self) -> None:
         super().tearDown()
 
-        print("Teardown ran successfully!")
-
-        Path(DB_PATH).unlink(missing_ok=False)
         asyncio.run(self.db.close())
+        Path(DB_PATH).unlink(missing_ok=False)
+
+        print("Teardown ran successfully!")
 
     # === individual method tests below this line ===
     # positive tests
