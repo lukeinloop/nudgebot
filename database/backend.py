@@ -328,7 +328,7 @@ class DBHandler:
 
         return cursor.lastrowid
 
-    async def add_course(self, name: str, code: str, term: str):
+    async def add_course(self, id: int, name: str, code: str, term: int):
         """
         Add a Canvas course to the database.
 
@@ -344,10 +344,10 @@ class DBHandler:
 
         cursor = await self.db.execute(
             """
-            INSERT INTO courses (course_name, course_code, term, last_synced_at)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO courses (course_id, course_name, course_code, term, last_synced_at)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (name, code, term, time.time()),
+            (id, name, code, term, time.time()),
         )
         await self.db.commit()
 
