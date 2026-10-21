@@ -16,6 +16,8 @@ from discord import app_commands
 import httpx
 
 from database.backend import DBHandler
+from canvas.assignments import submission_status
+
 
 class NudgeBot(discord.Client):
     """
@@ -322,6 +324,164 @@ async def assignments(
             ephemeral=True,
         )
 
+# Submissions command to show whether assignments were submitted, late, or missing
+@client.tree.command()
+@app_commands.describe(
+    days="Number of days before and after today to check",
+    course="Course name to filter assignments by",
+)
+async def submissions(
+    interaction: discord.Interaction,
+    days: app_commands.Range[int, 1, 60] = 7,
+    course: Optional[str] = None,
+):
+    """
+    Show the submission status of the user's recent and upcoming assignments.
+
+    Assignments due within the given number of days before or after today
+    are checked. Each one is labeled as submitted, submitted late, or not
+    submitted using submission_status().
+
+    :param interaction: The Discord interaction that triggered the command.
+    :type interaction: discord.Interaction
+    :param days: Number of days before and after today to check.
+    :type days: int
+    :param course: Optional course name used to filter assignments.
+    :type course: str | None
+    """
+    await interaction.response.defer(ephemeral=True)
+
+    api_key = await client.db.get_api_key(interaction.user.id)
+
+    if not api_key:
+        await interaction.followup.send(
+            "You haven't linked your Canvas account yet. Use /link to get started.",
+            ephemeral=True,
+        )
+        return
+
+    headers = {"Authorization": f"Bearer {api_key}"}
+    courses_url = "https://canvas.ou.edu/api/v1/courses"
+    courses_params: dict[str, str] = {
+        "per_page": "100",
+        "enrollment_state": "active",
+    }
+    assignment_params: dict[str, str] = {
+        "per_page": "100",
+        "include[]": "submission",
+    }
+
+    try:
+        now = datetime.now(timezone.utc)
+        start_date = now - timedelta(days=days)
+        end_date = now + timedelta(days=days)
+
+        results: list[tuple[datetime, str, str, str, str]] = []
+
+        async with httpx.AsyncClient() as http_client:
+            courses_response = await http_client.get(
+                courses_url, headers=headers, params=courses_params
+            )
+            courses_response.raise_for_status()
+
+            for canvas_course in courses_response.json():
+                course_name = canvas_course.get("name") or canvas_course.get(
+                    "course_code", "Unnamed Course"
+                )
+
+                # If the user selected a course, only check matching courses
+                if course and course.lower() not in course_name.lower():
+                    continue
+
+                assignments_response = await http_client.get(
+                    f"{courses_url}/{canvas_course.get('id')}/assignments",
+                    headers=headers,
+                    params=assignment_params,
+                )
+                assignments_response.raise_for_status()
+
+                for assignment in assignments_response.json():
+                    due_at = assignment.get("due_at")
+
+                    if not due_at:
+                        continue
+
+                    due_date = datetime.fromisoformat(due_at.replace("Z", "+00:00"))
+
+                    if not (start_date <= due_date <= end_date):
+                        continue
+
+                    submission = assignment.get("submission") or {}
+                    submitted_at = submission.get("submitted_at")
+
+                    submitted_date: Optional[datetime] = None
+                    if submitted_at:
+                        submitted_date = datetime.fromisoformat(
+                            submitted_at.replace("Z", "+00:00")
+                        )
+
+                    status = submission_status(
+                        {"due": due_date, "submitted_at": submitted_date}
+                    )
+
+                    if status == "submitted":
+                        label = "Submitted"
+                    elif status == "late":
+                        label = "Submitted late"
+                    elif due_date < now:
+                        label = "Missing (past due)"
+                    else:
+                        label = "Not submitted yet"
+
+                    results.append(
+                        (
+                            due_date,
+                            assignment.get("name", "Unnamed Assignment"),
+                            course_name,
+                            label,
+                            assignment.get("html_url"),
+                        )
+                    )
+
+        results.sort(key=lambda item: item[0])
+
+        if not results:
+            await interaction.followup.send(
+                f"No assignments due within {days} days of today.",
+                ephemeral=True,
+            )
+            return
+
+        message_lines = [f"**Submission status - {days} days before and after today**\n"]
+
+        for due_date, name, course_name, label, assignment_url in results:
+            timestamp = int(due_date.timestamp())
+
+            message_lines.append(
+                f"**{name}**\n"
+                f"Course: `{course_name}`\n"
+                f"Due: <t:{timestamp}:F> (<t:{timestamp}:R>)\n"
+                f"Status: **{label}**\n"
+                f"[Open in Canvas]({assignment_url})"
+            )
+
+        await interaction.followup.send("\n\n".join(message_lines), ephemeral=True)
+
+    except httpx.HTTPStatusError as e:
+        await interaction.followup.send(
+            f"Failed to retrieve submissions. "
+            f"Canvas API returned error status: {e.response.status_code}",
+            ephemeral=True,
+        )
+
+    except Exception as e:
+        print(f"Submissions error: {e}")
+
+        await interaction.followup.send(
+            "An unexpected error occurred while retrieving submissions.",
+            ephemeral=True,
+        )
+
 # Autocomplete function for assigments command
 @assignments.autocomplete("course")
 async def assignments_course_autocomplete(
@@ -383,6 +543,8 @@ async def assignments_course_autocomplete(
     except Exception as e:
         print(f"Course autocomplete error: {e}")
         return []
+
+submissions.autocomplete("course")(assignments_course_autocomplete)
 
 # !!! THIS IS ONLY FOR INTERACTING IN DMS !!!
 # !!! EVERYTHING ELSE SHOULD BE HANDLED THROUGH A SLASH COMMAND !!!
