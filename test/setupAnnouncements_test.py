@@ -20,6 +20,7 @@ from bot.bot import intents, NudgeBot, setup_announcements
 
 # FIXME do we need a separate test case for announcement polling?
 DB_PATH = "./test_database.sqlite"
+DEBUG = False
 
 
 class TestSetupAnnouncements(unittest.TestCase):
@@ -36,7 +37,8 @@ class TestSetupAnnouncements(unittest.TestCase):
         asyncio.run(self.db.initialize_db())
 
         # ensure all following INFO prints are on good lines
-        print()
+        if DEBUG:
+            print()
 
         # a lot of this is not documented exactly, as you're not supposed to create these manually,
         # so this had to be stolen from types/guild.py
@@ -101,7 +103,7 @@ class TestSetupAnnouncements(unittest.TestCase):
             ),
         )
 
-        # TODO: fake discord channel(s)
+        # fake discord channel(s)
         self.fake_discord_channels = {
             0: discord.TextChannel(
                 state=MagicMock(ConnectionState),
@@ -146,7 +148,7 @@ class TestSetupAnnouncements(unittest.TestCase):
         # evil force assign channels to the guild
         self.fake_discord_server._channels = self.fake_discord_channels
 
-        # TODO: fake discord users
+        # fake discord users
         self.fake_discord_users = [
             discord.User(
                 state=MagicMock(ConnectionState),
@@ -216,7 +218,7 @@ class TestSetupAnnouncements(unittest.TestCase):
             ),
         ]
 
-        # TODO: make fake interactions
+        # make fake interactions
         self.interaction = discord.Interaction(
             data={
                 "app_permissions": 2**16,
@@ -260,27 +262,37 @@ class TestSetupAnnouncements(unittest.TestCase):
         self.fake_access_tokens = [
             "fake_token_1",
             "48749864164898146514w6ef496sef469asf",
-            "85as4f+6asf46e41f65asf"
+            "85as4f+6asf46e41f65asf",
         ]
 
         # ========= set up the test database with fake data =========
         # create fake users
         count = 0
         for fake_discord_user in self.fake_discord_users:
-            ret = asyncio.run(self.db.create_user(fake_discord_user.id, fake_discord_user.name))
+            ret = asyncio.run(
+                self.db.create_user(fake_discord_user.id, fake_discord_user.name)
+            )
 
             if ret is not None:
                 count += 1
-        print(f"Initialized DB with {count} fake users")
+        if DEBUG:
+            print(f"Initialized DB with {count} fake users")
 
         # give them fake API tokens
         count = 0
         for i, fake_discord_user in enumerate(self.fake_discord_users):
-            #TODO make add_api_key return something other than None
-            ret = asyncio.run(self.db.add_api_key(fake_discord_user.id, "https://canvas.ou.edu/", self.fake_access_tokens[i]))
+            # TODO make add_api_key return something other than None
+            ret = asyncio.run(
+                self.db.add_api_key(
+                    fake_discord_user.id,
+                    "https://canvas.ou.edu/",
+                    self.fake_access_tokens[i],
+                )
+            )
 
             count += 1
-        print(f"Added {count} fake access tokens")
+        if DEBUG:
+            print(f"Added {count} fake access tokens")
 
         # create fake classes (as the enrollments table has a foreign key from the courses table)
         self.fake_courses = [
@@ -313,22 +325,26 @@ class TestSetupAnnouncements(unittest.TestCase):
         count = 0
         for course in self.fake_courses:
             ret = asyncio.run(
-                self.db.add_course(course["course_id"], course["name"], course["code"], course["term"])
+                self.db.add_course(
+                    course["course_id"], course["name"], course["code"], course["term"]
+                )
             )
 
             if ret is not None:
                 count += 1
-        print(f"Added {count} fake courses to database!")
+        if DEBUG:
+            print(f"Added {count} fake courses to database!")
 
         # get internal user IDs (yes we should just make test objects, it can be a PBI)
         self.fake_user_ids = []
         for user in self.fake_discord_users:
             user_row = asyncio.run(self.db.get_user(user.id))
-    
+
             if user_row is not None:
                 user_id = user_row[0]
                 self.fake_user_ids.append(user_id)
-        print(f"Found {len(self.fake_user_ids)} users in the database!")
+        if DEBUG:
+            print(f"Found {len(self.fake_user_ids)} users in the database!")
 
         # insert/give fake users fake classes 'n Canvas stuff, specifically, in the enrollments table.
         asyncio.run(
@@ -378,16 +394,43 @@ class TestSetupAnnouncements(unittest.TestCase):
         asyncio.run(self.db.close())
         Path(DB_PATH).unlink(missing_ok=False)
 
-        print("Teardown ran successfully!")
+        if DEBUG:
+            print("Teardown ran successfully!")
 
     # === individual method tests below this line ===
     # positive tests
     def test_sendAnnouncementPing(self):
-        # setup_announcements.callback(
-        #     Group, discord.Interaction(), course_id=None, channel=self.fake_discord_channels[0], ping=True
-        # )
-        # # TODO
+        # with professor role, all correct input, should pass
+        asyncio.run(
+            setup_announcements.callback(
+                self.interaction,
+                self.fake_courses[0]["course_id"],
+                self.fake_discord_channels[0],
+                True,
+            )
+        )
+        # TODO
         pass
+
+    def test_setupAnnouncementNoPing(self):
+        # with professor role, all correct input, should pass
+        # TODO copy from above
+        pass
+
+    # negative tests (incorrect input, we want to produce every command failure message)
+    # not in the discord server
+    # channel doesn't exist
+    # discord bot not in channel
+    # bot doesn't have channel permissions
+    # canvas credentials not linked
+    # user not enrolled in course
+    # user enrolled in course, but not a professor
+
+    # play stupid games, win stupid prizes tests (can't actually happen irl, but we have to have them anyways)
+    # malformed Interaction
+    # malformed User in the Interaction
+    # user not in DB ??
+    # canvas data is like, incorrect? we don't check that though. not my problem.
 
 
 """
