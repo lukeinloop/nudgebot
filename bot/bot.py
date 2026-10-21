@@ -330,7 +330,7 @@ async def assignments(
     days="Number of days before and after today to check",
     course="Course name to filter assignments by",
 )
-async def submissions(
+async def sub_missions(
     interaction: discord.Interaction,
     days: app_commands.Range[int, 1, 60] = 7,
     course: Optional[str] = None,
@@ -544,7 +544,7 @@ async def assignments_course_autocomplete(
         print(f"Course autocomplete error: {e}")
         return []
 
-submissions.autocomplete("course")(assignments_course_autocomplete)
+sub_missions.autocomplete("course")(assignments_course_autocomplete)
 
 # !!! THIS IS ONLY FOR INTERACTING IN DMS !!!
 # !!! EVERYTHING ELSE SHOULD BE HANDLED THROUGH A SLASH COMMAND !!!
