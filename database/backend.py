@@ -250,7 +250,7 @@ class DBHandler:
         # Find the internal database user ID from the Discord ID.
         cursor = await self.db.execute(
             """
-            SELECT 1 
+            SELECT * 
             FROM users u
             WHERE u.discord_id = ?
             LIMIT 1
@@ -390,7 +390,7 @@ class DBHandler:
 
         cursor = await self.db.execute(
             """
-            SELECT 1 
+            SELECT * 
             FROM users u
             WHERE u.discord_id = ?
             LIMIT 1
@@ -417,7 +417,7 @@ class DBHandler:
             WHERE enrollments.user_id = ? 
             LIMIT 50
             """,
-            (user_id),
+            (user_id,),
         )
 
         return await cursor.fetchall()
