@@ -13,8 +13,10 @@ from unittest.mock import MagicMock, patch
 
 import discord
 from database.backend import DBHandler
-from bot.bot import intents, NudgeBot, setup_announcements
+import bot
+from bot.bot import setup_announcements, NudgeBot
 
+import uuid
 
 DB_PATH = "./test_database.sqlite"
 DEBUG = False
@@ -22,9 +24,11 @@ DEBUG = False
 
 # also patch the client object in the bot, because obviously it's uninitialized as we don't directly import the module,
 # we only care about the setup_announcements function.
-# patch.object(bot.bot, "client", autospec=NudgeBot, create=True).start()  # type: ignore
-# bot.bot.client.user = MagicMock(autospec=discord.User)
-# bot.bot.client.user.id = 123456789
+patch.object(bot.bot, "client", autospec=NudgeBot, create=True).start()  # type: ignore
+bot.bot.client.user = MagicMock(autospec=discord.User)  # type: ignore
+bot.bot.client.user.id = 693993751  # type: ignore
+bot.bot.client.user.name = "NudgeBot"  # type: ignore
+
 
 class TestSetupAnnouncements(unittest.TestCase):
     def setUp(self):
@@ -37,8 +41,8 @@ class TestSetupAnnouncements(unittest.TestCase):
         asyncio.run(self.db.connect())
         asyncio.run(self.db.initialize_db())
 
-        #TODO what's the point of making a separate DB handler if we're just going to use the real one anyways?
-        # bot.bot.client.db = self.db
+        # TODO what's the point of making a separate DB handler if we're just going to use the real one anyways?
+        bot.bot.client.db = self.db  # type: ignore
 
         # ensure all following INFO prints are on good lines
         if DEBUG:
@@ -49,11 +53,12 @@ class TestSetupAnnouncements(unittest.TestCase):
         # if it looks more doable in the future, or somebody has time, look back in the commit history for this file,
         # specifically on the feat/canvas-announcements branch, to get an idea of how you might be able to do it.
 
-        #TODO still need data payloads and everything
         self.fake_discord_server = MagicMock(discord.Guild, autospec=True)
+        self.fake_discord_server.id = 123456789
 
         # discord server that the bot is not in
         self.evil_discord_server = MagicMock(discord.Guild, autospec=True)
+        self.evil_discord_server.id = 3141592653
 
         # fake discord channel(s)
         self.fake_discord_channels = {
@@ -66,29 +71,74 @@ class TestSetupAnnouncements(unittest.TestCase):
 
         # fake discord users
         self.fake_discord_users = {
-            0: MagicMock(discord.User, autospec=True),
-            1: MagicMock(discord.User, autospec=True),
-            2: MagicMock(discord.User, autospec=True),
-            3: MagicMock(discord.User, autospec=True),
-            4: MagicMock(discord.User, autospec=True),
-            5: MagicMock(discord.User, autospec=True),
+            # SQL indices must start at 1
+            random.randint(1000, 10000): MagicMock(discord.User, autospec=True),
+            random.randint(1000, 10000): MagicMock(discord.User, autospec=True),
+            random.randint(1000, 10000): MagicMock(discord.User, autospec=True),
+            random.randint(1000, 10000): MagicMock(discord.User, autospec=True),
+            random.randint(1000, 10000): MagicMock(discord.User, autospec=True),
+            random.randint(1000, 10000): MagicMock(discord.User, autospec=True),
         }
+
+        count = 0
+        for id, user in self.fake_discord_users.items():
+            count += 1
+            user.id = id
+            user.name = f"Test User {count}"
+
+        # add the bot as a user as well, so it gets added to the Guild / channels
+        self.fake_discord_users[bot.bot.client.user.id] = bot.bot.client.user  # type: ignore
 
         # make fake interactions
         self.interaction = MagicMock(discord.Interaction, autospec=True)
 
-        # fake canvas data
-        self.fake_access_tokens = [
-            "fake_token_1",
-            "48749864164898146514w6ef496sef469asf",
-            "85as4f+6asf46e41f65asf",
-            "bot_access_token-apihfp9ahefienfon"
-        ]
+        # fake canvas api tokens
+        self.fake_access_tokens = {
+            id: str(uuid.uuid4()) for id, user in self.fake_discord_users.items()
+        }
+
+        # fake methods
+        def get_member(user_id: int) -> discord.Member:
+            return self.fake_discord_users[user_id]
+
+        self.permissions = discord.Permissions()
+        def permissions_for(member: discord.Member) -> discord.Permissions:
+            return self.permissions
+
+        # keep track of last message
+        self.last_message = ""
+        async def send_message(message: str, **kwargs) -> None:
+            if DEBUG:
+                print(f"Fake message sent: {message}")
+            self.last_message = message
+
+        self.interaction.response = MagicMock(
+            discord.InteractionResponse, autospec=True
+        )
+        self.interaction.response.send_message = send_message
+
+        # add all of the fake data to the fake server
+        self.fake_discord_server.channels = self.fake_discord_channels.values()
+        self.fake_discord_server.get_member = get_member
+
+        for id, channel in self.fake_discord_channels.items():
+            # give the channel data
+            channel.id = id
+            channel.name = f"Test Channel {id}"
+
+            # add the guild to each channel
+            channel.guild = self.fake_discord_server
+
+            # setup permissions for each channel
+            # TODO
+            channel.permissions_for = permissions_for
+
+        self.interaction.guild = self.fake_discord_server
 
         # ========= set up the test database with fake data =========
         # create fake users
         count = 0
-        self.fake_user_ids = [] # internal DB IDs
+        self.fake_user_ids = []  # internal DB IDs
         for id, fake_discord_user in self.fake_discord_users.items():
             internal_id = asyncio.run(
                 self.db.create_user(fake_discord_user.id, fake_discord_user.name)
@@ -146,47 +196,60 @@ class TestSetupAnnouncements(unittest.TestCase):
         if DEBUG:
             print(f"Added {count} fake courses to database!")
 
-        # insert/give fake users fake classes 'n Canvas stuff, specifically, in the enrollments table.
-        asyncio.run(
-            self.db.add_enrollment(
-                self.fake_user_ids[0],
-                self.fake_courses[0]["course_id"],
-                "professor",
-                self.fake_discord_server.id,
+        # add user 1 to all classes as a professor
+        for course in self.fake_courses:
+            asyncio.run(
+                self.db.add_enrollment(
+                    self.fake_user_ids[0],
+                    course["course_id"],
+                    "professor",
+                    self.fake_discord_server.id,
+                )
             )
-        )
-        asyncio.run(
-            self.db.add_enrollment(
-                self.fake_user_ids[0],
-                self.fake_courses[0]["course_id"],
-                "student",
-                self.fake_discord_server.id,
+
+        # add user 2 to all classes as a student
+        for course in self.fake_courses:
+            asyncio.run(
+                self.db.add_enrollment(
+                    self.fake_user_ids[1],
+                    course["course_id"],
+                    "student",
+                    self.fake_discord_server.id,
+                )
             )
-        )
-        asyncio.run(
-            self.db.add_enrollment(
-                self.fake_user_ids[1],
-                self.fake_courses[1]["course_id"],
-                "student",
-                self.fake_discord_server.id,
+
+        # add user 3 to half of the classes
+        for course in self.fake_courses[:3]:
+            asyncio.run(
+                self.db.add_enrollment(
+                    self.fake_user_ids[2],
+                    course["course_id"],
+                    "professor",
+                    self.fake_discord_server.id,
+                )
             )
-        )
-        asyncio.run(
-            self.db.add_enrollment(
-                self.fake_user_ids[1],
-                self.fake_courses[3]["course_id"],
-                "student",
-                self.fake_discord_server.id,
+
+        # add user 4 to the other half
+        for course in self.fake_courses[3:]:
+            asyncio.run(
+                self.db.add_enrollment(
+                    self.fake_user_ids[3],
+                    course["course_id"],
+                    "student",
+                    self.fake_discord_server.id,
+                )
             )
-        )
-        asyncio.run(
-            self.db.add_enrollment(
-                self.fake_user_ids[1],
-                self.fake_courses[2]["course_id"],
-                "professor",
-                self.fake_discord_server.id,
+
+        # add user 5 as a TA to all classes
+        for course in self.fake_courses:
+            asyncio.run(
+                self.db.add_enrollment(
+                    self.fake_user_ids[4],
+                    course["course_id"],
+                    "TA",
+                    self.fake_discord_server.id,
+                )
             )
-        )
 
     def tearDown(self) -> None:
         super().tearDown()
@@ -200,12 +263,15 @@ class TestSetupAnnouncements(unittest.TestCase):
     # === individual method tests below this line ===
     # positive tests
     def test_sendAnnouncementPing(self):
+        # test user 1
+        self.interaction.user = list(self.fake_discord_users.values())[0]
+
         # with professor role, all correct input, should pass
         ret = asyncio.run(
             setup_announcements.callback(
-                self.interaction,  # type: ignore
+                self.interaction,
                 self.fake_courses[0]["course_id"],
-                self.fake_discord_channels[0], # type: ignore
+                self.fake_discord_channels[0],
                 True,  # type: ignore
             )
         )
@@ -214,8 +280,13 @@ class TestSetupAnnouncements(unittest.TestCase):
         self.assertTrue(ret)
 
         # check that it sent the correct output
-        # TODO
+        self.assertTrue("announcements successfully set up for course" in self.last_message.lower())
 
+        #TODO: if we have more time, it would be prudent to check that the DB entry in the announcements table is actually there,
+        # with the correct information, but since this is just for the assignment (and tbf the book did say only one assert per test as a guideline),
+        # I don't honestly think it matters that much.
+
+    # same as above, but with ping set to False. DB entry should thus only be different by a single column
     def test_setupAnnouncementNoPing(self):
         # with professor role, all correct input, should pass
         # TODO copy from above
