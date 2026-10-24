@@ -394,7 +394,7 @@ async def assignments_course_autocomplete(
     channel="Discord channel to send announcements in (defaults to current channel)",
     ping="Whether to @everyone for announcements or not."
 )
-async def setup_announcements(interaction: discord.Interaction, course_id: int, channel: discord.TextChannel, ping=True) -> bool:
+async def setup_announcements(interaction: discord.Interaction, course_id: int, channel: discord.TextChannel, ping: bool=True) -> bool:
     """
     Configure Canvas announcement notifications.
 
@@ -416,7 +416,7 @@ async def setup_announcements(interaction: discord.Interaction, course_id: int, 
         return False
 
     # check that the channel exists
-    if channel not in interaction.guild.channels:
+    if channel.id not in [c.id for c in interaction.guild.channels]:
         await interaction.response.send_message("Channel does not exist! Cannont set up announcements!", ephemeral=True)
         return False
 

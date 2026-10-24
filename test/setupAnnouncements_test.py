@@ -50,10 +50,16 @@ patch.object(
     discord.interactions.InteractionResponse, "send_message", send_message
 ).start()
 
-# also patch the client object in the bot, because obviously it's uninitialized as we don't directly import the module,
-# we only care about the setup_announcements function
-patch.object(bot.bot, "client", create=True).start()  # type: ignore
+# also need to prevent the Interaction from actually trying to make real discord API calls
+# async def _get
 
+# patch(discord.Interaction._state._get_guild).start()
+
+# also patch the client object in the bot, because obviously it's uninitialized as we don't directly import the module,
+# we only care about the setup_announcements function.
+patch.object(bot.bot, "client", autospec=NudgeBot, create=True).start()  # type: ignore
+bot.bot.client.user = MagicMock(autospec=discord.User)
+bot.bot.client.user.id = 123456789
 
 class TestSetupAnnouncements(unittest.TestCase):
     def setUp(self):
@@ -68,9 +74,11 @@ class TestSetupAnnouncements(unittest.TestCase):
         asyncio.run(self.db.connect())
         asyncio.run(self.db.initialize_db())
 
+        #TODO what's the point of making a separate DB handler if we're just going to use the real one anyways?
+        bot.bot.client.db = self.db
+
         # ensure all following INFO prints are on good lines
-        if DEBUG:
-            print()
+        print()
 
         # a lot of this is not documented exactly, as you're not supposed to create these manually,
         # so this had to be stolen from types/guild.py
@@ -135,6 +143,68 @@ class TestSetupAnnouncements(unittest.TestCase):
             ),
         )
 
+        # discord server that the bot is not in
+        self.evil_discord_server = discord.Guild(
+            data={
+                "id": 498462651320,
+                "name": "Evil Guild",
+                "icon": None,
+                "splash": None,
+                "discovery_splash": None,
+                "emojis": [],
+                "features": [],
+                "description": "This guild doesn't actually exist, nor should anyone be able to see it",
+                "incidents_data": None,
+                # taken from types/guild.py
+                "owner_id": 79854163212,
+                "region": "gb",
+                "afk_channel_id": None,
+                "afk_timeout": 0,
+                "verification_level": 0,
+                "default_message_notifications": 0,
+                "explicit_content_filter": 0,
+                "roles": [],
+                "mfa_level": 1,
+                "nsfw_level": 0,
+                "application_id": None,
+                "system_channel_id": None,
+                "system_channel_flags": 0,
+                "rules_channel_id": None,
+                "vanity_url_code": None,
+                "banner": None,
+                "premium_tier": 0,
+                "preferred_locale": "FR",
+                "public_updates_channel_id": None,
+                "stickers": [],
+                "stage_instances": [],
+                "guild_scheduled_events": [],
+                "icon_hash": None,
+                "owner": False,
+                "permissions": "",
+                "widget_enabled": False,
+                "widget_channel_id": None,
+                "joined_at": None,
+                "large": False,
+                "member_count": 3,
+                "voice_states": [],
+                "members": [],
+                "channels": [],
+                "presences": [],
+                "threads": [],
+                "max_presences": 0,
+                "max_members": 150,
+                "premium_subscription_count": 0,
+                "max_video_channel_users": 0,
+                "soundboard_sounds": [],
+            },
+            state=ConnectionState(
+                dispatch=MagicMock(Callable),
+                handlers={"test_handler": MagicMock(Callable)},
+                hooks={"on_open": MagicMock(Callable), "on_close": MagicMock(Callable)},
+                http=HTTPClient(loop=MagicMock(asyncio.AbstractEventLoop)),
+            ),
+        )
+
         # fake discord channel(s)
         self.fake_discord_channels = {
             0: discord.TextChannel(
@@ -148,7 +218,7 @@ class TestSetupAnnouncements(unittest.TestCase):
                     "permission_overwrites": [],
                     "nsfw": False,
                     "parent_id": None,
-                    "topic": "None",
+                    "topic": "This is the good channel that will always work.",
                     "last_message_id": None,
                     "last_pin_timestamp": "",
                     "rate_limit_per_user": 0,
@@ -167,7 +237,7 @@ class TestSetupAnnouncements(unittest.TestCase):
                     "permission_overwrites": [],
                     "nsfw": False,
                     "parent_id": None,
-                    "topic": "Very yes, much topic. There is topic yes believe me.",
+                    "topic": "Very yes, much topic. There is topic yes believe me. This is the evil channel.",
                     "last_message_id": None,
                     "last_pin_timestamp": "",
                     "rate_limit_per_user": 0,
@@ -175,9 +245,27 @@ class TestSetupAnnouncements(unittest.TestCase):
                     "type": 0,
                 },
             ),
-            2: None,
+            2: discord.TextChannel(
+                state=MagicMock(ConnectionState),
+                guild=self.evil_discord_server,
+                data={
+                    "id": 693993751,
+                    "name": "Evil Cannel",
+                    "guild_id": self.evil_discord_server.id,
+                    "position": 0,
+                    "permission_overwrites": [],
+                    "nsfw": True,
+                    "parent_id": None,
+                    "topic": "This channel is not part of the good discord server.",
+                    "last_message_id": -1,
+                    "last_pin_timestamp": "",
+                    "rate_limit_per_user": 0,
+                    "default_thread_rate_limit_per_user": 0,
+                    "type": 0,
+                },
+            ),
         }
-        # evil force assign channels to the guild
+        # HACK evil force assign channels to the guild
         self.fake_discord_server._channels = self.fake_discord_channels
 
         # fake discord users
@@ -249,6 +337,61 @@ class TestSetupAnnouncements(unittest.TestCase):
                 },  # type: ignore
             ),
         ]
+        # add the bot itself as a user too
+        self.fake_discord_users.append(
+            discord.User(
+                state=MagicMock(ConnectionState),
+                data={
+                    "id": bot.bot.client.user.id,
+                    "username": "Bot User",
+                    "discriminator": "discriminator",
+                    "avatar": None,
+                    "global_name": None,
+                    "avatar_decoration_data": None,
+                    "primary_guild": None,
+                    "collectibles": None,
+                    "bot": True,
+                    "system": False,
+                    "mfa_enabled": False,
+                    "locale": "US",
+                    "verified": True,
+                    "email": None,
+                    "flags": 999999999,
+                    "premium_type": 0,
+                    "public_flags": 9999999,
+                },  # type: ignore
+            ),
+        )
+
+        # add fake members to the fake discord server
+        self.fake_discord_members = {}
+        for user in self.fake_discord_users:
+            self.fake_discord_members[user.id] = discord.Member(
+                data={
+                    "roles": [],
+                    "joined_at": "1970-01-01 01:01",
+                    "deaf": False,
+                    "mute": False,
+                    "flags": 0,
+                    "avatar": "no avatar",
+                    "user": user,
+                    "nick": user.name,
+                    "premium_since": None,
+                    "pending": False,
+                    "permissions": 0,
+                    "communication_disabled_until": "",
+                    "banner": None,
+                    "avatar_decoration_data": None,
+                },
+                guild=self.fake_discord_server,
+                state=MagicMock(ConnectionState),
+            )
+        
+        self.fake_discord_server._members = self.fake_discord_members
+        self.fake_discord_server._member_count = len(self.fake_discord_members)
+        if DEBUG:
+            print("Discord members:")
+            [print(m) for m in self.fake_discord_members]
 
         # make fake interactions
         self.interaction = discord.Interaction(
@@ -266,7 +409,9 @@ class TestSetupAnnouncements(unittest.TestCase):
                 ),
                 "created_at": None,
                 "custom_id": None,
-                "data": None,
+                "data": {
+
+                },
                 "entitlement_sku_ids": [],
                 "entitlements": [],
                 "expires_at": None,
@@ -289,14 +434,28 @@ class TestSetupAnnouncements(unittest.TestCase):
                 "user": None,
                 "version": 1,
             },  # type: ignore
+            #TODO FIXME this state needs to have its _get_guild() (and probably a lot of other things too) replaced with like return False or something? or have _state set to False? idk how you are supposed to do it
             state=MagicMock(autospec=ConnectionState, create=True),
         )
+
+        # override the magicmock auto-created attribute
+        def get_guild(guild_id: int):
+            return self.fake_discord_server
+        self.interaction._state._get_guild = get_guild # type: ignore
+
+        # override this auto-created attribute too
+        self.interaction_user = None
+        def get_user():
+            return self.interaction_user
+        self.interaction._state.get_user = get_user # type: ignore
+
 
         # fake canvas data
         self.fake_access_tokens = [
             "fake_token_1",
             "48749864164898146514w6ef496sef469asf",
             "85as4f+6asf46e41f65asf",
+            "bot_access_token-apihfp9ahefienfon"
         ]
 
         # ========= set up the test database with fake data =========
@@ -434,17 +593,31 @@ class TestSetupAnnouncements(unittest.TestCase):
     # === individual method tests below this line ===
     # positive tests
     def test_sendAnnouncementPing(self):
+        # add the custom interaction data for this test case
+        self.interaction.channel = self.fake_discord_channels[0]
+        assert self.interaction.guild is not None
+        self.interaction.guild._channels = self.fake_discord_channels # type: ignore
+
+        self.interaction.user = self.fake_discord_members[self.fake_discord_users[0].id]
+        self.interaction_user = self.interaction.user
+        self.interaction._state._users = self.fake_discord_users
+
+
         # with professor role, all correct input, should pass
-        asyncio.run(
+        ret = asyncio.run(
             setup_announcements.callback(
-                self.interaction,
+                self.interaction,  # type: ignore
                 self.fake_courses[0]["course_id"],
-                self.fake_discord_channels[0],
-                True,
+                self.fake_discord_channels[0], # type: ignore
+                True,  # type: ignore
             )
         )
+
+        # check that the function thinks it passed
+        self.assertTrue(ret)
+
+        # check that it sent the correct output
         # TODO
-        pass
 
     def test_setupAnnouncementNoPing(self):
         # with professor role, all correct input, should pass
