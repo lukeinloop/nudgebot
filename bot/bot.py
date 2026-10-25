@@ -410,7 +410,7 @@ async def setup_announcements(interaction: discord.Interaction, course_id: int, 
     :type ping: bool
     :rtype: bool        
     """
-    
+
     if interaction.guild is None:
         await interaction.response.send_message("Not in server! Cannot set up announcements!", ephemeral=True)
         return False
@@ -418,6 +418,10 @@ async def setup_announcements(interaction: discord.Interaction, course_id: int, 
     # check that the channel exists
     if channel.id not in [c.id for c in interaction.guild.channels]:
         await interaction.response.send_message("Channel does not exist! Cannont set up announcements!", ephemeral=True)
+        return False
+
+    # I don't think this can actually happen, but for the unit tests, included here.
+    if client is None:
         return False
 
     # check that the bot has permissions for the channel
@@ -434,6 +438,9 @@ async def setup_announcements(interaction: discord.Interaction, course_id: int, 
         await interaction.response.send_message("Discord bot does not have permissions for that channel!", ephemeral=True)
 
     # find user by their discord ID
+    if interaction.user is None:
+        return False # for the unit test, not something we actually need to check
+    
     user = await client.db.get_user(interaction.user.id)
 
     if user is None:
@@ -455,7 +462,7 @@ async def setup_announcements(interaction: discord.Interaction, course_id: int, 
         return False
 
     # make an entry in the table for poll_for_announcement() to grab
-    await client.db.setup_announcement(user[1], course_id, interaction.guild.id, channel.id, ping)
+    await client.db.setup_announcement(int(user[0]), course_id, interaction.guild.id, channel.id, ping)
 
     await interaction.response.send_message(f"Announcements successfully set up for course: {course_id} in channel: {channel.name}!", ephemeral=True)
     return True
