@@ -100,8 +100,7 @@ class TestSetupAnnouncements(unittest.TestCase):
         def get_member(user_id: int) -> discord.Member:
             return self.fake_discord_users[user_id]
 
-        self.permissions = discord.Permissions()
-
+        self.permissions = discord.Permissions(send_messages=True)
         def permissions_for(member: discord.Member) -> discord.Permissions:
             return self.permissions
 
@@ -138,11 +137,10 @@ class TestSetupAnnouncements(unittest.TestCase):
 
         # ========= set up the test database with fake data =========
         # create fake users
-        count = 0
         self.fake_user_ids = []  # internal DB IDs
         for id, fake_discord_user in self.fake_discord_users.items():
             # give them API tokens EXCEPT for user 4
-            if count == 3:
+            if "4" in fake_discord_user.name:
                 continue
 
             internal_id = asyncio.run(
@@ -508,7 +506,7 @@ class TestSetupAnnouncements(unittest.TestCase):
         self.assertTrue("channel does not exist" in self.last_message.lower())
 
     # malformed user (user for interaction is None, obviously this could never actually happen)
-    def test_notInServer(self):
+    def test_userIsNone(self):
         self.interaction.user = None
 
         ret = asyncio.run(
@@ -525,7 +523,7 @@ class TestSetupAnnouncements(unittest.TestCase):
 
     # client is None (perhaps after disconnected? idk how the function would be called irl with client being None)
     def test_clientIsNone(self):
-        bot.bot.client = None
+        bot.bot.client = None # type: ignore
 
         ret = asyncio.run(
             setup_announcements.callback(

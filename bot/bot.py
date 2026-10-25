@@ -433,9 +433,9 @@ async def setup_announcements(interaction: discord.Interaction, course_id: int, 
         await interaction.response.send_message("Discord bot is not in channel! Cannot set up announcements!", ephemeral=True)
         return False
 
-    send_permission = Permissions(send_messages=True)
-    if send_permission <= channel.permissions_for(member): # if it's a subset of member permisions
+    if not channel.permissions_for(member).send_messages: # if we can't send messages in the channel
         await interaction.response.send_message("Discord bot does not have permissions for that channel!", ephemeral=True)
+        return False
 
     # find user by their discord ID
     if interaction.user is None:
