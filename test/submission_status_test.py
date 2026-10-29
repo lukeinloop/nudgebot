@@ -9,7 +9,7 @@ Copyright 2026 Group K: Luke Sewell, Janes Le, Daniel Brown, Will Craddock, Make
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from submission_status import submission_status
+from canvas.assignments import submission_status
 
 
 class TestSubmissionStatus(unittest.TestCase):
@@ -17,7 +17,10 @@ class TestSubmissionStatus(unittest.TestCase):
         self.deadline = datetime.now(timezone.utc)
 
     def test_valid_submitted(self):
-        assignment = {"due": self.deadline, "submitted_at": self.deadline - timedelta(hours=2)}
+        assignment = {
+            "due": self.deadline,
+            "submitted_at": self.deadline - timedelta(hours=2),
+        }
         self.assertEqual(submission_status(assignment), "submitted")
 
     def test_valid_not_submitted(self):
@@ -37,7 +40,10 @@ class TestSubmissionStatus(unittest.TestCase):
         self.assertEqual(submission_status(assignment), "submitted")
 
     def test_edge_just_after_deadline(self):
-        assignment = {"due": self.deadline, "submitted_at": self.deadline + timedelta(seconds=1)}
+        assignment = {
+            "due": self.deadline,
+            "submitted_at": self.deadline + timedelta(seconds=1),
+        }
         self.assertEqual(submission_status(assignment), "late")
 
 
