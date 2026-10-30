@@ -8,6 +8,7 @@ Copyright 2026 Group K: Luke Sewell, Janes Le, Daniel Brown. Not open source. Al
 
 # this file was modified from: https://github.com/Rapptz/discord.py/blob/v2.7.1/examples/app_commands/basic.py
 
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -925,3 +926,70 @@ async def on_message(message: discord.Message):
 
     # otherwise, do nothing
     return
+
+
+class PerformanceMonitor:
+    """
+    Watch for errors then alert the host by email when one happens,
+    being careful not to spam them with repeated alerts from the same source.
+
+    :param host_email: Address that receives the alerts.
+    :type host_email: str
+    :param send_email: Function that sends an email, called as send_email(to, body).
+    :type send_email: Callable[[str, str], None]
+    :param alert_cooldown: Seconds before another email is sent for the same source.
+    :type alert_cooldown: float
+    """
+
+    def __init__(
+        self,
+        host_email: str,
+        send_email: Callable[[str, str], None],
+        alert_cooldown: float = 600,
+    ) -> None:
+        self.host_email = host_email
+        self.send_email = send_email
+        self.alert_cooldown = alert_cooldown
+        self.error_count = 0
+        self.log: list[str] = []
+        self._last_alert: dict[str, float] = {}
+
+    def send_error_announcement(
+        self, error: Exception, source: str, now: float | None = None
+    ) -> bool:
+        """
+        Log an error and email the host unless the source is in its cooldown.
+
+        A failed email is logged instead of raised, so the bot keeps running,
+        and it does not start the cooldown, so the next error tries again.
+
+        :param error: The exception that occurred.
+        :type error: Exception
+        :param source: Where it happened, e.g. a command name like "/courses".
+        :type source: str
+        :param now: Current time as a Unix timestamp (defaults to the real time).
+        :type now: float | None
+        :return: True if an email was sent, False otherwise.
+        :rtype: bool
+        """
+        if now is None:
+            now = datetime.now(timezone.utc).timestamp()
+
+        self.error_count += 1
+        when = datetime.fromtimestamp(now, timezone.utc).isoformat()
+        details = f"{type(error).__name__} in {source} at {when}: {error}"
+
+        last_alert = self._last_alert.get(source)
+        if last_alert is not None and now - last_alert < self.alert_cooldown:
+            self.log.append(f"SUPPRESSED {details}")
+            return False
+
+        try:
+            self.send_email(self.host_email, f"NudgeBot error\n\n{details}")
+        except Exception as e:
+            self.log.append(f"EMAIL FAILED ({type(e).__name__}) {details}")
+            return False
+
+        self._last_alert[source] = now
+        self.log.append(f"SENT {details}")
+        return True
