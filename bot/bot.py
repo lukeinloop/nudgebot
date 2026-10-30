@@ -373,7 +373,7 @@ async def priority_list(
     }
 
     # request up to 100 active courses
-    courses_params = {
+    courses_params: dict[str, str | int] = {
         "per_page": 100,
         "enrollment_state": "active",
     }
@@ -451,15 +451,18 @@ async def priority_list(
         ):
             # Convert the due date to a Unix timestamp.
             # Discord uses this format to display localized dates and times.
-            due_timestamp = int(
-                assignment["due_date"].timestamp()
-            )
+            due_date = assignment["due_date"]
+
+            if not isinstance(due_date, datetime):
+                continue
+
+            due_timestamp = int(due_date.timestamp())
 
             # Extract info needed to display each assignment
-            name = assignment["name"]
-            course_name = assignment["course"]
-            priority = assignment["priority_score"]
-            points = assignment["points"]
+            name = str(assignment["name"])
+            course_name = str(assignment["course"])
+            priority = str(assignment["priority_score"])
+            points = str(assignment["points"])
             assignment_url = assignment["url"]
 
             # Show a link if canvas provides one, otherwise display the plain name
@@ -518,7 +521,7 @@ async def priority_list(
             ephemeral=True,
         )
 
-def createPriorityList(assignments, days=7, course=None, now=None, course_names=None):
+def createPriorityList(assignments: list[dict[str, object]], days: int = 7, course: str | None = None, now: datetime | None = None, course_names: dict[int, str] | None = None) -> list[dict[str, object]]:
     """
     Filter and rank assignments by point value and deadline urgency.
 
@@ -547,27 +550,29 @@ def createPriorityList(assignments, days=7, course=None, now=None, course_names=
     URGENCY_WEIGHT = 0.40
 
     # Array for assignments that pass the filters as well as their scores
-    prioritized_assignments = []
+    prioritized_assignments: list[dict[str, object]] = []
 
     # examine each event returned by the Canvas API
-    for assignment in assignments:
+    for event in assignments:
 
         # Ignore events that are not assignments
-        if assignment.get("type") != "assignment":
+        if event.get("type") != "assignment":
             continue
 
         # retrieve the details associated with assignment
-        assignment = assignment.get("assignment")
+        assignment_data = event.get("assignment")
 
         # skip any event that doesnt contain assignment info
-        if not assignment:
+        if not isinstance(assignment_data, dict):
             continue
+
+        assignment: dict[str, object] = assignment_data
 
         # retrieve assignment due date
         due_at = assignment.get("due_at")
 
         # skip assignments without a due date as they dont have any priority 
-        if not due_at:
+        if not isinstance(due_at, str):
             continue
 
         # convert canvas's ISO 8601 due-date string to a datetime object
@@ -581,6 +586,9 @@ def createPriorityList(assignments, days=7, course=None, now=None, course_names=
 
         # retrieve course id that contains this assignment
         course_id = assignment.get("course_id")
+
+        if not isinstance(course_id, int):
+            continue
 
         # look up the course name using the ID
         course_name = course_names.get(
@@ -600,8 +608,8 @@ def createPriorityList(assignments, days=7, course=None, now=None, course_names=
         points_possible = assignment.get("points_possible")
 
         # missing or invalid point values should not crash the command
-        if points_possible is None:
-            points_possible = 0
+        if not isinstance(points_possible, (int, float)):
+            points_possible = 0.0
 
         # convet point value to float and prevent negative numbers from reducing assignment priority
         points_possible = max(float(points_possible), 0.0)
@@ -631,16 +639,20 @@ def createPriorityList(assignments, days=7, course=None, now=None, course_names=
             GRADE_WEIGHT * grade_score
             + URGENCY_WEIGHT * urgency_score
         )
+        name = assignment.get("name")
+        if not isinstance(name, str):
+            name = "Unnamed Assignment"
+
+        assignment_url = assignment.get("html_url")
+        if not isinstance(assignment_url, str):
+            assignment_url = None
 
         # save assignment details and caluclated scores for sorting and displaying in response on discord
         prioritized_assignments.append({
-            "name": assignment.get(
-                "name",
-                "Unnamed Assignment",
-            ),
+            "name": name,
             "course": course_name,
             "due_date": due_date,
-            "url": assignment.get("html_url"),
+            "url": assignment_url,
             "points": points_possible,
             "grade_score": grade_score,
             "urgency_score": urgency_score,
