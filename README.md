@@ -125,7 +125,7 @@ All branches should correspond to a sprint backlog item.
    git clone https://github.com/lukeinloop/nudgebot.git
    cd nudgebot
    ```
-3. Install dependencies
+2. Install dependencies
    Make sure Python is installed. Create and activate a virtual environment.
 
   Windows:
