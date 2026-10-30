@@ -42,7 +42,7 @@ A public bot invite link will not be provided while the project is in its curren
 
 ### For Developers
 #### Requirements
-- Python 3.x
+- Python 3.13 or newer
 - A Discord application and bot
 - A Discord development server
 - A Canvas account with permissions to generate API keys
@@ -102,7 +102,7 @@ NudgeBot currently supports the following slash commands.
 
 ### `/assignments`
 
-- Retrieves upcoming assignments from the user's linked Canvas acccount.
+- Retrieves upcoming assignments from the user's linked Canvas account.
 
 - Users can specify the number of days ahead to view assignments, with the default set to 7 days.
 
@@ -118,6 +118,64 @@ Additional commands will be documented here as they are implemented.
 NudgeBot is collaboratively developed as part of a semester long university course. 
   
 All branches should correspond to a sprint backlog item.
+
+## Developer Setup and Unit Testing
+
+1. **Clone the NudgeBot repository and navigate to the project directory:**
+
+   ```bash
+   git clone https://github.com/lukeinloop/nudgebot.git
+   cd nudgebot
+   ```
+
+2. **Install dependencies**
+
+   Make sure Python is installed. Create and activate a virtual environment.
+
+   **Windows:**
+
+   ```bash
+   py -3 -m venv venv
+   venv\Scripts\activate
+   ```
+
+   > **PowerShell users:** if `venv\Scripts\activate` fails with "running scripts is disabled on this system", run the command below, then run `venv\Scripts\activate` again. It only applies to the current PowerShell window.
+   >
+   > ```bash
+   > Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+   > ```
+
+
+   **macOS/Linux:**
+
+   ```bash
+   python3.14 -m venv venv || python3.13 -m venv venv
+   source venv/bin/activate
+   ```
+
+   Install the required dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Run Unit Tests**
+
+   NudgeBot uses Python's unittest framework to test bot functionality. Unit tests use mocked Discord interactions and Canvas API responses, so a running Discord bot or real Canvas credentials are not required for the assignments tests.
+
+   To run the assignment unit tests, execute the following command from the project's root directory:
+
+   ```bash
+   python -m unittest discover -s test -p "TEST_FILE_NAME_HERE" -v
+   ```
+
+   To run all unit tests in the test directory:
+
+   ```bash
+   python -m unittest discover -s test -p "*_test.py" -v
+   ```
+
+   A successful test run will display `OK` in the terminal.
 
 ### Feature Branches
 For new features, create a new feature branch using:  
@@ -166,7 +224,7 @@ These limitations are part of the current proof of concept implementation.
 A production implementation would require at least:
 - A more secure credential management strategy
 - Appropriate authentication
-- Peristent and properly secured database infrastructure
+- Persistent and properly secured database infrastructure
 - Backups
 - Migrations
 - Access controls
