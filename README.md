@@ -42,7 +42,7 @@ A public bot invite link will not be provided while the project is in its curren
 
 ### For Developers
 #### Requirements
-- Python 3.x
+- Python 3.12.10
 - A Discord application and bot
 - A Discord development server
 - A Canvas account with permissions to generate API keys
