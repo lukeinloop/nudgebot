@@ -102,7 +102,7 @@ NudgeBot currently supports the following slash commands.
 
 ### `/assignments`
 
-- Retrieves upcoming assignments from the user's linked Canvas acccount.
+- Retrieves upcoming assignments from the user's linked Canvas account.
 
 - Users can specify the number of days ahead to view assignments, with the default set to 7 days.
 
@@ -118,6 +118,43 @@ Additional commands will be documented here as they are implemented.
 NudgeBot is collaboratively developed as part of a semester long university course. 
   
 All branches should correspond to a sprint backlog item.
+
+## Developer Setup and Unit Testing
+1. Clone the NudgeBot repository and navigate to the project directory:
+   ```bash
+   git clone https://github.com/lukeinloop/nudgebot.git
+   cd nudgebot
+   ```
+3. Install dependencies
+   Make sure Python is installed. Create and activate a virtual environment.
+
+  Windows:
+```bash
+python -m venv venv
+venv\Scripts\activate
+```
+  macOS/Linux:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+Install the required dependencies:
+```bash
+pip install -r requirements.txt
+```
+3. Run Unit Tests
+
+NudgeBot uses Python's unittest framework to test bot functionality. Unit tests use mocked Discord interactions and Canvas API responses, so a running Discord bot or real Canvas credentials are not required for the assignments tests.
+
+To run the assignment unit tests, execute the following command from the project's root directory:
+
+Ex. ```bash python -m unittest discover -s test -p "TEST_FILE_NAME_HERE" -v ```
+
+To run all unit tests in the test directory:
+```bash 
+python -m unittest discover -s test -p "*_test.py" -v
+```
+A successful test run will display OK in the terminal.
 
 ### Feature Branches
 For new features, create a new feature branch using:  
@@ -166,7 +203,7 @@ These limitations are part of the current proof of concept implementation.
 A production implementation would require at least:
 - A more secure credential management strategy
 - Appropriate authentication
-- Peristent and properly secured database infrastructure
+- Persistent and properly secured database infrastructure
 - Backups
 - Migrations
 - Access controls
