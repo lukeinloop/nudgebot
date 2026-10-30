@@ -324,6 +324,341 @@ async def assignments(
             ephemeral=True,
         )
 
+
+# Command to create a priority list of what assignments to do first
+@client.tree.command()
+@app_commands.describe(days="Number of days ahead to show assignments",
+                       course="Course name to filter assignments by",
+)
+async def priority_list(
+    interaction: discord.Interaction,
+    days: app_commands.Range[int, 1, 60] = 7,
+    course: Optional[str] = None,
+):
+    """
+    Retrieve upcoming Canvas assignments and rank them by priority using createPriorityList().
+
+    Priority is based on assignment point value and deadline urgency.
+    In the future point value will be replaced with grade weight. 
+
+    :param interaction: The Discord interaction that triggered the command.
+    :type interaction: discord.Interaction
+    :param days: Number of days ahead to show upcoming assignments.
+    :type days: int
+    :param course: Optional course name used to filter assignments.
+    :type course: str | None
+    """
+
+    await interaction.response.defer(ephemeral=True)
+
+    # Retrieve the user's Canvas API key by using their Discord user ID
+    api_key = await client.db.get_api_key(interaction.user.id)
+
+    # If the user has not linked their Canvas account, notify them 
+    if not api_key:
+        await interaction.followup.send(
+            "You haven't linked your Canvas account yet. "
+            "Use /link to get started.",
+            ephemeral=True,
+        )
+        return
+
+    # canvas api endpoints
+    events_url = "https://canvas.ou.edu/api/v1/users/self/upcoming_events"
+    courses_url = "https://canvas.ou.edu/api/v1/courses"
+
+    # authenticate requests to canvas with the user's api key
+    headers = {
+        "Authorization": f"Bearer {api_key}"
+    }
+
+    # request up to 100 active courses
+    courses_params = {
+        "per_page": 100,
+        "enrollment_state": "active",
+    }
+
+    try:
+        # The 20 second timeout helps prevent requests from hanging
+        async with httpx.AsyncClient(timeout=20.0) as http_client:
+
+            # Retrieve the user's upcoming Canvas events
+            events_response = await http_client.get(
+                events_url,
+                headers=headers,
+            )
+
+            # raise an exception if canvas returns unsuccessful status
+            events_response.raise_for_status()
+
+            # convert json response into python data
+            events = events_response.json()
+
+            # Retrieve user's active courses
+            courses_response = await http_client.get(
+                courses_url,
+                headers=headers,
+                params=courses_params,
+            )
+
+            # Same as above but for courses
+            courses_response.raise_for_status()
+            courses_data = courses_response.json()
+
+        # Create a dictionary mapping each Canvas course ID to its name
+        # Use course code if name doesn't exist otherwise use fallback of "Unnamed Course"
+        course_names = {
+            canvas_course["id"]: (
+                canvas_course.get("name")
+                or canvas_course.get("course_code")
+                or "Unnamed Course"
+            )
+            for canvas_course in courses_data
+        }
+
+        # Use UTC to compare assignment deadlines
+        now = datetime.now(timezone.utc)
+
+        prioritized_assignments = createPriorityList(events, days=days, course=course, now=now, course_names=course_names)
+
+        # if no assignments pass the filters, notify user and stop
+        if not prioritized_assignments:
+            await interaction.followup.send(
+                f"No upcoming assignments found in the next {days} days.",
+                ephemeral=True,
+            )
+            return
+
+        # create a heading that reflects if the user filtered by course
+        if course:
+            heading = (
+                f"**Assignment Priorities: {course}**\n"
+                f"Evaluating the next {days} days.\n"
+            )
+        else:
+            heading = (
+                f"**Assignment Priorities**\n"
+                f"Evaluating the next {days} days.\n"
+            )
+
+        # start building the discord message    
+        message_lines = [heading]
+
+        # format each assignment as a numbered entry 
+        for index, assignment in enumerate(
+            prioritized_assignments,
+            start=1,
+        ):
+            # Convert the due date to a Unix timestamp.
+            # Discord uses this format to display localized dates and times.
+            due_timestamp = int(
+                assignment["due_date"].timestamp()
+            )
+
+            # Extract info needed to display each assignment
+            name = assignment["name"]
+            course_name = assignment["course"]
+            priority = assignment["priority_score"]
+            points = assignment["points"]
+            assignment_url = assignment["url"]
+
+            # Show a link if canvas provides one, otherwise display the plain name
+            if assignment_url:
+                assignment_title = f"[{name}]({assignment_url})"
+            else:
+                assignment_title = name
+
+            # add the assignment's name, course, point value, priority score, and deadline to list of message lines
+            message_lines.append(
+                f"**{index}. {assignment_title}**\n"
+                f"Course: `{course_name}`\n"
+                f"Points: `{points:g}`\n"
+                f"Priority: `{priority:.1f}/100`\n"
+                f"Due: <t:{due_timestamp}:F> "
+                f"(<t:{due_timestamp}:R>)"
+            )
+
+        # Combine the heading and assignment entries into one message, seperating with blank line
+        message = "\n\n".join(message_lines)
+
+        # send the priority list as an ephemeral discord message
+        await interaction.followup.send(
+            message,
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+
+    # Error handling
+    except httpx.HTTPStatusError as e:
+        print(
+            f"Canvas API error: {e.response.status_code} "
+            f"{e.response.text}"
+        )
+
+        await interaction.followup.send(
+            "Failed to retrieve assignments. "
+            f"Canvas returned HTTP {e.response.status_code}.",
+            ephemeral=True,
+        )
+
+    except httpx.RequestError as e:
+        print(f"Canvas connection error: {e}")
+
+        await interaction.followup.send(
+            "Could not connect to Canvas. Please try again later.",
+            ephemeral=True,
+        )
+
+    except Exception as e:
+        print(f"Priorities error: {e}")
+
+        await interaction.followup.send(
+            "An unexpected error occurred while calculating priorities.",
+            ephemeral=True,
+        )
+
+def createPriorityList(assignments, days=7, course=None, now=None, course_names=None):
+    """
+    Filter and rank assignments by point value and deadline urgency.
+
+    Args:
+        assignments: A list of assignment dictionaries
+        days: Number of days to look ahead
+        course: Optional course name filter
+        now: Current time provided for testing or defaults to current time in UTC
+
+    Returns:
+        A list of qualifying assignments sorted by highest priority first
+    """
+
+    if course_names is None:
+        course_names = {}
+
+    # Allow tests to provide a fixed time for consistent results.
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    # Calculate the end of the requested assignment search window
+    end_date = now + timedelta(days=days)
+
+    # these weights can be adjusted later, together they add up to 1.0
+    GRADE_WEIGHT = 0.60
+    URGENCY_WEIGHT = 0.40
+
+    # Array for assignments that pass the filters as well as their scores
+    prioritized_assignments = []
+
+    # examine each event returned by the Canvas API
+    for assignment in assignments:
+
+        # Ignore events that are not assignments
+        if assignment.get("type") != "assignment":
+            continue
+
+        # retrieve the details associated with assignment
+        assignment = assignment.get("assignment")
+
+        # skip any event that doesnt contain assignment info
+        if not assignment:
+            continue
+
+        # retrieve assignment due date
+        due_at = assignment.get("due_at")
+
+        # skip assignments without a due date as they dont have any priority 
+        if not due_at:
+            continue
+
+        # convert canvas's ISO 8601 due-date string to a datetime object
+        due_date = datetime.fromisoformat(
+            due_at.replace("Z", "+00:00")
+        )
+
+        # Only consider upcoming assignments in the requested window, past due assignments are not included
+        if not now.date() <= due_date.date() <= end_date.date():
+            continue
+
+        # retrieve course id that contains this assignment
+        course_id = assignment.get("course_id")
+
+        # look up the course name using the ID
+        course_name = course_names.get(
+            course_id,
+            "Unknown Course",
+        )
+
+        # apply the optional course filter
+        if course and course.lower() not in course_name.lower():
+            continue    
+
+        # ignore assignments that have already been submitted
+        if assignment.get("has_submitted_submissions", False):
+            continue
+
+        # retrieve # of points available for the assignment
+        points_possible = assignment.get("points_possible")
+
+        # missing or invalid point values should not crash the command
+        if points_possible is None:
+            points_possible = 0
+
+        # convet point value to float and prevent negative numbers from reducing assignment priority
+        points_possible = max(float(points_possible), 0.0)
+
+        # normalize assignment importance to a number between 0 and 1
+        # Higher point assignments receive a higher score
+        # Dividing by (points_possible + 100) prevents the score from increasing linearly without limit
+        # For example a 100 point assignment receives a score of 0.5
+        grade_score = points_possible / (
+            points_possible + 100.0
+        )
+
+        # calculate the number of days until the deadline, max() prevnets negative values
+        hours_remaining = max(
+            (due_date - now).total_seconds() / 3600,
+            0,
+        )
+
+        # convert remaining time from hours to days
+        days_remaining = hours_remaining / 24
+
+        # urgency rises as the deadline approaches (at days_remaining 0 this equals 1, which is the highest priority)
+        urgency_score = 1 / (days_remaining + 1)
+
+        # Combine grade importance and urgency using the assigned weights then multiply by 100 for a score out of 100   
+        priority_score = 100 * (
+            GRADE_WEIGHT * grade_score
+            + URGENCY_WEIGHT * urgency_score
+        )
+
+        # save assignment details and caluclated scores for sorting and displaying in response on discord
+        prioritized_assignments.append({
+            "name": assignment.get(
+                "name",
+                "Unnamed Assignment",
+            ),
+            "course": course_name,
+            "due_date": due_date,
+            "url": assignment.get("html_url"),
+            "points": points_possible,
+            "grade_score": grade_score,
+            "urgency_score": urgency_score,
+            "priority_score": priority_score,
+        })
+
+    # Sort by highest priority first
+    # if two assignments have the same score, later date comes first because the secondary sort key is reversed
+    prioritized_assignments.sort(
+        key=lambda assignment: (
+            assignment["priority_score"],
+            assignment["due_date"],
+        ),
+        reverse=True,
+    )
+
+    return prioritized_assignments
+        
 # Submissions command to show whether assignments were submitted, late, or missing
 @client.tree.command()
 @app_commands.describe(
