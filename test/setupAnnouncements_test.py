@@ -536,3 +536,6 @@ class TestSetupAnnouncements(unittest.TestCase):
 
         # we expect it to fail
         self.assertFalse(ret)
+
+if __name__ == "__main__":
+    unittest.main()
