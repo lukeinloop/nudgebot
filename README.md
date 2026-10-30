@@ -42,7 +42,7 @@ A public bot invite link will not be provided while the project is in its curren
 
 ### For Developers
 #### Requirements
-- Python 3.12.10
+- Python 3.13 or newer
 - A Discord application and bot
 - A Discord development server
 - A Canvas account with permissions to generate API keys
@@ -130,12 +130,12 @@ All branches should correspond to a sprint backlog item.
 
   Windows:
 ```bash
-python -m venv venv
+py -3 -m venv venv
 venv\Scripts\activate
 ```
   macOS/Linux:
 ```bash
-python3 -m venv venv
+python3.14 -m venv venv || python3.13 -m venv venv
 source venv/bin/activate
 ```
 Install the required dependencies:
