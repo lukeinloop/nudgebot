@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import discord
-from discord import app_commands
+from discord import Permissions, app_commands
 import httpx
 
 from database.backend import DBHandler
@@ -57,6 +57,10 @@ class NudgeBot(discord.Client):
         # This copies the global commands over to your guild.
         self.tree.copy_global_to(guild=self.guild_id)
         await self.tree.sync(guild=self.guild_id)
+
+    async def poll_for_announcements(self):
+        #TODO figure out how we're going to do this
+        pass
 
 
 intents = discord.Intents(guilds=True, messages=True, members=True, message_content=True)
@@ -892,6 +896,88 @@ async def assignments_course_autocomplete(
         return []
 
 sub_missions.autocomplete("course")(assignments_course_autocomplete)
+
+
+@client.tree.command()
+@app_commands.describe(
+    course_id="Canvas course ID to pull announcements from",
+    channel="Discord channel to send announcements in (defaults to current channel)",
+    ping="Whether to @everyone for announcements or not."
+)
+async def setup_announcements(interaction: discord.Interaction, course_id: int, channel: discord.TextChannel, ping: bool=True) -> bool:
+    """
+    Configure Canvas announcement notifications.
+
+    The bot will periodically poll Canvas for new announcements and send them in the configured channels.
+    Must be a professor to configure the announcements. Returns a boolean for easier unit testing, since 
+    we are on the unit testing section of the course.
+
+    :param course_id: Canvas ID of the canvas course to track announcements from.
+    :type course_id: int
+    :param channel: Channel to send announcements in. Can be the same channel the command is run, or specify a different channel.
+    :type channel: discord.TextChannel
+    :param ping: whether to @everyone when sending the announcement message.
+    :type ping: bool
+    :rtype: bool        
+    """
+
+    if interaction.guild is None:
+        await interaction.response.send_message("Not in server! Cannot set up announcements!", ephemeral=True)
+        return False
+
+    # check that the channel exists
+    if channel.id not in [c.id for c in interaction.guild.channels]:
+        await interaction.response.send_message("Channel does not exist! Cannont set up announcements!", ephemeral=True)
+        return False
+
+    # I don't think this can actually happen, but for the unit tests, included here.
+    if client is None:
+        return False
+
+    # check that the bot has permissions for the channel
+    if client.user is None:
+        return False
+    
+    member = channel.guild.get_member(client.user.id)
+    if member is None:
+        await interaction.response.send_message("Discord bot is not in channel! Cannot set up announcements!", ephemeral=True)
+        return False
+
+    if not channel.permissions_for(member).send_messages: # if we can't send messages in the channel
+        await interaction.response.send_message("Discord bot does not have permissions for that channel!", ephemeral=True)
+        return False
+
+    # find user by their discord ID
+    if interaction.user is None:
+        return False # for the unit test, not something we actually need to check
+    
+    user = await client.db.get_user(interaction.user.id)
+
+    if user is None:
+        await interaction.response.send_message("You don't have your canvas credentials linked! Please use /link and try again!", ephemeral=True)
+        return False
+
+    # check that the user is actually in the course
+    courses = await client.db.get_courses_by_user(user[0])
+    for course in courses:
+        if course[2] == course_id:
+            # they are in this course, check if they are a professor
+            if course[3] == "professor":
+                break # they pass the check
+            else:
+                await interaction.response.send_message(f"You must be a professor to set up announcement tracking! You are not a professor for course: {course_id}", ephemeral=True)
+                return False
+    else:
+        await interaction.response.send_message(f"You must be enrolled in the course to set up announcements! Not enrolled in course: {course_id}", ephemeral=True)
+        return False
+
+    # make an entry in the table for poll_for_announcement() to grab
+    await client.db.setup_announcement(int(user[0]), course_id, interaction.guild.id, channel.id, ping)
+
+    await interaction.response.send_message(f"Announcements successfully set up for course: {course_id} in channel: {channel.name}!", ephemeral=True)
+    return True
+
+#TODO autocomplete for setup_announcements
 
 # !!! THIS IS ONLY FOR INTERACTING IN DMS !!!
 # !!! EVERYTHING ELSE SHOULD BE HANDLED THROUGH A SLASH COMMAND !!!
