@@ -139,6 +139,13 @@ All branches should correspond to a sprint backlog item.
    venv\Scripts\activate
    ```
 
+   > **PowerShell users:** if `venv\Scripts\activate` fails with "running scripts is disabled on this system", run the command below, then run `venv\Scripts\activate` again. It only applies to the current PowerShell window.
+   >
+   > ```bash
+   > Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+   > ```
+
+
    **macOS/Linux:**
 
    ```bash
