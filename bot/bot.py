@@ -677,7 +677,7 @@ def createPriorityList(assignments: list[dict[str, object]], days: int = 7, cour
     days="Number of days before and after today to check",
     course="Course name to filter assignments by",
 )
-async def sub_missions(
+async def submissions(
     interaction: discord.Interaction,
     days: app_commands.Range[int, 1, 60] = 7,
     course: Optional[str] = None,
@@ -891,7 +891,7 @@ async def assignments_course_autocomplete(
         print(f"Course autocomplete error: {e}")
         return []
 
-sub_missions.autocomplete("course")(assignments_course_autocomplete)
+submissions.autocomplete("course")(assignments_course_autocomplete)
 
 # !!! THIS IS ONLY FOR INTERACTING IN DMS !!!
 # !!! EVERYTHING ELSE SHOULD BE HANDLED THROUGH A SLASH COMMAND !!!
