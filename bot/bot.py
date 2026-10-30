@@ -303,7 +303,6 @@ async def assignments(
                 f"[Open in Canvas]({assignment_url})"
             )
 
-        message_lines.append("THIS IS A TEST MESSAGE FOR THE ASSIGNMENT!")
         await interaction.followup.send(
             "\n\n".join(message_lines),
             ephemeral=True,
