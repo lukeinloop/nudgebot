@@ -9,3 +9,6 @@
 
 # encryption keys!
 *.key
+
+# custom vscode configurations
+.vscode
