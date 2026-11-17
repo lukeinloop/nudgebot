@@ -97,6 +97,9 @@ class BackendConnection:
         :return: the InternalUser model that was created
         :rtype: InternalUser
         """
+
+        #TODO: input validation
+
         user = InternalUser(discord_id=discord_id)
 
         self.db.commit()
@@ -111,6 +114,7 @@ class BackendConnection:
         
         #TODO: docstring
         
+        # grab the associated internal user
         internal_user = InternalUser.get(discord_id=discord_id)
 
         # input validation
@@ -175,3 +179,54 @@ class BackendConnection:
         self.db.commit()
 
         return course
+
+    #TODO: update_canvas_course()?
+
+    #TODO: where and when do we make the Roles?
+
+    # enrollments
+    #TODO what is this even for lol
+    @db_session
+    def create_enrollment(self, user_id: int, course_id: int, role: Role, discord_server_id: int) -> Enrollment | None:
+        #TODO docstring
+
+        #TODO input validation
+
+        enrollment = Enrollment(user_id=user_id, course_id=course_id, role=role.role, discord_server_id=discord_server_id)
+
+        self.db.commit()
+
+        return enrollment
+
+    # assignments
+    @db_session
+    def create_assignment(self, course_id: int, title: str, due_at: datetime, description=None, reminder_date=None) -> Assignment | None:
+        #TODO docstring
+
+        #TODO input validation
+
+        #TODO set the reminder date to a reasonable default value, if it is None
+
+        #TODO add an empty desc???
+
+        #TODO actually make the object
+
+        self.db.commit()
+
+        #TODO return object
+        return
+
+    # reminders
+    def create_reminder(self, user_id: int, assignment_id: int, remind_at: datetime) -> Reminder | None:
+        #TODO docstring
+
+        #TODO input validation
+
+        #TODO validate that the user is actually in the class? is this something we want to do?
+
+        # obviously, it is not yet sent, as this function is creating it
+        reminder = Reminder(user_id=user_id, assignment_id=assignment_id, remind_at=remind_at, sent=False)
+
+        self.db.commit()
+
+        return reminder

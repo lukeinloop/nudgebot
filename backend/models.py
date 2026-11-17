@@ -60,9 +60,9 @@ class Enrollment(db.Entity):
     """Enrollments model, used to match internal users to courses, and discord server snowflakes."""
 
     # internal user ID (foreign key)
-    user_id = Optional("InternalUser.id")
+    user_id = Required("InternalUser.id")
     # canvas course ID (foreign key)
-    course_id = Optional("CanvasCourse")
+    course_id = Required("CanvasCourse")
     # a role from the Roles table (professor, student, TA, etc.)
     role = Required("Role")
     # discord server ID the command was run in
@@ -99,6 +99,6 @@ class Reminder(db.Entity):
     assignment_id = Required(int)  # TODO foreign key
     remind_at = Required(datetime)
     sent = Required(bool)
-    sent_at = Required(datetime)
+    sent_at = Optional(datetime)
 
     updated_at = Required(datetime, default=time)
