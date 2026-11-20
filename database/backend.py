@@ -15,6 +15,8 @@ the database connection, creating the required tables, and performing
 user and Canvas credential operations.
 """
 
+from typing import Iterable, List
+
 import aiosqlite
 
 import time
@@ -183,6 +185,21 @@ class DBHandler:
             ")"
         )
 
+        # Where to poll for canvas announcements and where to send them
+        await self.db.execute(
+            "CREATE TABLE IF NOT EXISTS announcements ("
+            "announcement_id INTEGER PRIMARY KEY,"
+            "user_id INTEGER NOT NULL,"
+            "course_id INTEGER NOT NULL,"
+            "guild_id INTEGER NOT NULL,"
+            "channel_id INTEGER NOT NULL,"
+            "ping BOOLEAN DEFAULT TRUE,"
+            "last_checked TIMESTAMP,"
+            "FOREIGN KEY(user_id) REFERENCES users(user_id),"
+            "FOREIGN KEY(course_id) REFERENCES courses(course_id)"
+            ")"
+        )
+
     # Checks the "users" table for the given discord user ID
     async def get_api_key(self, discord_id: int) -> str | None:
         """
@@ -233,7 +250,7 @@ class DBHandler:
         # Find the internal database user ID from the Discord ID.
         cursor = await self.db.execute(
             """
-            SELECT 1 
+            SELECT * 
             FROM users u
             WHERE u.discord_id = ?
             LIMIT 1
@@ -310,3 +327,153 @@ class DBHandler:
         await self.db.commit()
 
         return cursor.lastrowid
+
+    async def add_course(self, id: int, name: str, code: str, term: int):
+        """
+        Add a Canvas course to the database.
+
+        :param name: Display name of the Canvas course.
+        :type name: str
+        :param code: Unique Canvas code for the course.
+        :type code: str
+        :param term: Semester + Year, ex. "Fa2023", "Sp2027".
+        :type term: str
+        :return: The ID assigned to the newly created record.
+        :rtype: int
+        """
+
+        cursor = await self.db.execute(
+            """
+            INSERT INTO courses (course_id, course_name, course_code, term, last_synced_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (id, name, code, term, time.time()),
+        )
+        await self.db.commit()
+
+        return cursor.lastrowid
+
+    async def add_enrollment(self, user_id: int, course_id: int, role: str, discord_server_id: int):
+        """
+        Create a new entry for a user and a course in the enrollments table in the database.
+
+        :param user_id: The internal user ID of the user
+        :type user_id: int
+        :param course_id: The Canvas course ID of the course the user is enrolled in
+        :type course_id: int
+        :param role: One of "student" or "professor" or "TA" 
+        :type role: str
+        :param discord_server_id: Discord Snowflake ID of the server the command was run in.
+        :type discord_server_id: int
+        """
+
+        cursor = await self.db.execute(
+            """
+            INSERT INTO enrollments (user_id, course_id, role, discord_server_id)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, course_id, role, discord_server_id)
+        )
+        await self.db.commit()
+
+        return cursor.lastrowid
+
+    async def get_user(self, discord_id: int) -> aiosqlite.Row | None:
+        """
+        Get a user's information from the database by their discord user ID.
+
+        :param discord_id: Discord snowflake ID of the user.
+        :type discord_id: int
+        :return: The user's row from the database, if they exist. None if they do not.
+        :rtype: aiosqlite.Row
+        """
+
+        cursor = await self.db.execute(
+            """
+            SELECT * 
+            FROM users u
+            WHERE u.discord_id = ?
+            LIMIT 1
+            """,
+            (discord_id,),
+        )
+
+        return await cursor.fetchone()
+
+    async def get_courses_by_user(self, user_id: int) -> Iterable[aiosqlite.Row]:
+        """
+        Fetch all courses in the enrollments table for a given user.
+
+        :param user_id: ID of the user from the users table.
+        :type user_id: int
+        :return: All rows in the enrollments table for the user.
+        :rtype: Iterable[aiosqlite.Row]
+        """
+
+        cursor = await self.db.execute(
+            """
+            SELECT *
+            FROM enrollments
+            WHERE enrollments.user_id = ? 
+            LIMIT 50
+            """,
+            (user_id,),
+        )
+
+        return await cursor.fetchall()
+
+    async def setup_announcement(
+        self,
+        user_id: int,
+        course_id: int,
+        discord_server_id: int,
+        discord_channel_id: int,
+        ping: bool,
+    ) -> int | None:
+        """
+        Make an entry in the announcements table that poll_for_announcements() checks when sending Canvas
+        announcements in Discord.
+
+        :param user_id: ID of the user from the users table.
+        :type user_id: int
+        :param course_id: Canvas ID of the canvas course to track announcements from.
+        :type course_id: int
+        :param discord_server_id: Discord ID of the server announcements are getting set up there.
+        :type discord_server_id: int
+        :param discord_channel_id: Channel ID of the (text) channel where announcements get set up.
+        :type discord_channel_id: int
+        :param ping: whether to @everyone when sending the announcement message.
+        :type ping: bool
+        :return: All rows in the enrollments table for the user.
+        :rtype: Iterable[aiosqlite.Row]
+        """
+
+        # TODO: input validation
+
+        # create new entry
+        cursor = await self.db.execute(
+            """
+            INSERT INTO announcements (user_id, course_id, guild_id, channel_id, ping, last_checked)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                course_id,
+                discord_server_id,
+                discord_channel_id,
+                ping,
+                time.time(),
+            ),
+        )
+        await self.db.commit()
+
+        return cursor.lastrowid
+
+    async def get_announcements(self) -> List[aiosqlite.Row]:
+        # TODO: docstring
+
+        # TODO: for every row in announcements table
+        # return it?
+        # FIXME I don't like how big this might eventually get, maybe figure a better way to split it up?
+
+        return []
