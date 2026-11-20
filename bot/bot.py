@@ -14,7 +14,8 @@ from typing import Optional
 
 import discord
 from discord import app_commands
-import httpx
+
+from canvasapi import Canvas
 
 from database.backend import DBHandler
 from canvas.assignments import submission_status
@@ -41,6 +42,7 @@ class NudgeBot(discord.Client):
 
         self.guild_id: discord.Object
         self.db: DBHandler
+        self.base_url: str
 
         self.tree = app_commands.CommandTree(self)
 
@@ -130,7 +132,6 @@ async def courses(interaction: discord.Interaction):
         )
         return
 
-    url = "https://canvas.ou.edu/api/v1/courses"
     headers = {"Authorization": f"Bearer {api_key}"}
     params: dict[str, str | int] = {
     "per_page": 20,
@@ -138,11 +139,9 @@ async def courses(interaction: discord.Interaction):
 }
 
     try:
-        # async client since discord.py is asynchronous
-        async with httpx.AsyncClient() as http_client:
-            response = await http_client.get(url, headers=headers, params=params)
-            response.raise_for_status()
-            courses_data = response.json()
+        canvas = Canvas(client.base_url, api_key)
+
+        courses_data = canvas.get_courses()
 
         if not courses_data:
             await interaction.followup.send("No active courses found.", ephemeral=True)
@@ -158,11 +157,6 @@ async def courses(interaction: discord.Interaction):
         # Send the finalized list
         await interaction.followup.send("\n".join(message_lines), ephemeral=True)
 
-    except httpx.HTTPStatusError as e:
-        await interaction.followup.send(
-            f"Failed to retrieve courses. Canvas API returned error status: {e.response.status_code}",
-            ephemeral=True,
-        )
     except Exception:
         await interaction.followup.send("An unexpected error occurred.", ephemeral=True)
 
@@ -203,32 +197,22 @@ async def assignments(
         )
         return
 
-    url = "https://canvas.ou.edu/api/v1/users/self/upcoming_events"
-    headers = {"Authorization": f"Bearer {api_key}"}
-
-    courses_url = "https://canvas.ou.edu/api/v1/courses"
-    courses_params: httpx.QueryParams = httpx.QueryParams({
-    "per_page": "100",
-    "enrollment_state": "active",
-    })
-
     try:
-        async with httpx.AsyncClient() as http_client:
-            # Get upcoming assignments
-            response = await http_client.get(url, headers=headers)
-            response.raise_for_status()
-            events = response.json()
+        # Get upcoming assignments
+        canvas = Canvas(client.base_url, api_key)
 
-            # Get active courses
-            courses_response = await http_client.get(
-                courses_url,
-                headers=headers,
-                params=courses_params,
-            )
-            courses_response.raise_for_status()
-            courses_data = courses_response.json()
+        events = canvas.get_upcoming_events()
 
-            course_names = {}
+        # Get active courses
+        courses_response = await http_client.get(
+            courses_url,
+            headers=headers,
+            params=courses_params,
+        )
+        courses_response.raise_for_status()
+        courses_data = courses_response.json()
+
+        course_names = {}
 
         for canvas_course in courses_data:
             course_id = canvas_course.get("id")
@@ -379,31 +363,10 @@ async def priority_list(
     }
 
     try:
-        # The 20 second timeout helps prevent requests from hanging
-        async with httpx.AsyncClient(timeout=20.0) as http_client:
+        canvas = Canvas(client.base_url, api_key)
 
-            # Retrieve the user's upcoming Canvas events
-            events_response = await http_client.get(
-                events_url,
-                headers=headers,
-            )
-
-            # raise an exception if canvas returns unsuccessful status
-            events_response.raise_for_status()
-
-            # convert json response into python data
-            events = events_response.json()
-
-            # Retrieve user's active courses
-            courses_response = await http_client.get(
-                courses_url,
-                headers=headers,
-                params=courses_params,
-            )
-
-            # Same as above but for courses
-            courses_response.raise_for_status()
-            courses_data = courses_response.json()
+        events = canvas.get_activity_stream_summary()
+        courses_data = canvas.get_courses()
 
         # Create a dictionary mapping each Canvas course ID to its name
         # Use course code if name doesn't exist otherwise use fallback of "Unnamed Course"

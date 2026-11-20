@@ -45,6 +45,9 @@ def main() -> None:
     client.guild_id = Object(os.environ["GUILD_ID"])
     client.db = db
 
+    # since this will be instanced per-university, pass in the university's Canvas URL
+    client.base_url = os.environ["CANVAS_URL"].strip()
+
     # start the bot
     client.run(os.environ["TOKEN"])
 
